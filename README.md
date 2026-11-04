@@ -1,6 +1,15 @@
-# CodeMirror 2.0: Beginner Coding-Learning Platform & Socratic Tutor
+# CodeMirror 2.0 (Code Wizard): Beginner Coding-Learning Platform & Socratic Tutor
 
 A beginner-friendly, lab-style computer science learning workspace and backend data server featuring a searchable language catalog, dedicated language curriculum pages, real-time host toolchain verification, executable multi-language sandbox, a 7-step pedagogical lab guide, server-side Gemini AI integration with offline Socratic fallback, and **real server-side authentication with session tokens, hashed passwords, and role-based access control**.
+
+---
+
+## 🌐 Live Public Website URLs (Accessible From Any Device & Network)
+
+- **Main Website (Login & Portal):** https://devsum1614-source.github.io/codemirror2/
+- **Student Dashboard (1-Click Auto-Login):** https://devsum1614-source.github.io/codemirror2/student/
+- **Site Owner / Admin Console (1-Click Auto-Login):** https://devsum1614-source.github.io/codemirror2/admin-console/
+- **Teacher Portal (1-Click Auto-Login):** https://devsum1614-source.github.io/codemirror2/teacher/
 
 ---
 
