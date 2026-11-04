@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMirror 2.0 - Beginner Coding Tutor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261105_4">
+</head>
+<body>
+  <!-- Ambient background canvas (respects prefers-reduced-motion) -->
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="confetti-canvas"></canvas>
+
+  <div id="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+      <div class="brand-wrapper" id="brand-btn" role="button" tabindex="0" title="Go to Languages Home">
+        <div class="brand-logo" style="background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; font-weight: 800; border-radius: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(99,102,241,0.35);">CW</div>
+        <div class="brand-text">
+          <h1 id="site-header-title">Code Wizard <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">2.0</span></h1>
+        </div>
+      </div>
+
+      <nav aria-label="Main Navigation" id="main-nav-container" style="display: none;">
+        <ul class="nav-links">
+          <li>
+            <button class="nav-btn active" data-view="languages" id="nav-languages-btn">
+              <span>🌐</span> Languages
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-view="dashboard">
+              <span>📊</span> Dashboard
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-view="missions">
+              <span>🎯</span> All Labs
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-view="workspace">
+              <span>💻</span> Workspace
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-view="skillproof">
+              <span>🛡️</span> SkillProof
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-view="report">
+              <span>📑</span> Report
+            </button>
+          </li>
+          <li id="nav-admin-li" style="display: none;">
+            <button class="nav-btn" data-view="admin" id="nav-admin-btn" style="color: var(--indigo-primary); font-weight: 700;">
+              <span>⚙️</span> <span id="admin-nav-label">Admin Console</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Authenticated User Stats & Controls -->
+      <div class="nav-user" id="nav-user-container" style="display: none;">
+        <div class="user-badge" id="current-user-badge" title="Authenticated Profile">
+          <div class="user-avatar" id="user-avatar-initials">PP</div>
+          <div style="display: flex; flex-direction: column; text-align: left;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-weight: 700; font-size: 0.82rem;" id="user-name">Student</span>
+              <span id="user-role-badge" class="diff-badge" style="padding: 1px 6px; font-size: 0.65rem; background: rgba(79,70,229,0.1); color: var(--indigo-primary);">student</span>
+            </div>
+            <span style="font-size: 0.68rem; color: var(--text-muted);" id="user-id-display">stu_alex_vance</span>
+          </div>
+          <span class="stat-pill streak" title="Streak" id="pill-streak">🔥 <span id="user-streak">3d</span></span>
+          <span class="stat-pill points" title="Audited XP Points" id="pill-points">⭐ <span id="user-points">0 XP</span></span>
+          <span class="stat-pill readiness" title="Player Level" id="pill-level">🎯 <span id="user-readiness">Lvl 1</span></span>
+        </div>
+        <button id="theme-toggle-btn" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem; margin-left: 4px;" title="Toggle Dark/Light Mode">
+          <span id="theme-icon">🌙</span>
+        </button>
+        <button id="signout-btn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" title="Sign out of current account">
+          Sign Out
+        </button>
+      </div>
+
+      <!-- Unauthenticated Nav Actions -->
+      <div id="nav-auth-buttons" style="display: flex; align-items: center; gap: 8px;">
+        <button id="theme-toggle-unauth-btn" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;" title="Toggle Dark/Light Mode">
+          <span id="theme-icon-unauth">🌙</span>
+        </button>
+        <button id="nav-btn-login-student" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.82rem;">Student Sign In</button>
+        <button id="nav-btn-login-admin" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.82rem;">Admin Portal</button>
+      </div>
+    </header>
+
+    <!-- ========================================================
+         VIEW 0A: STUDENT SIGN IN & REGISTRATION
+         ======================================================== -->
+    <section id="view-student-login" class="view-section active auth-view">
+      <div class="auth-card-container">
+        <div class="auth-card">
+          <div class="auth-header">
+            <div class="brand-logo" style="margin: 0 auto 12px; width: 48px; height: 48px; font-size: 1.4rem;">&lt;/&gt;</div>
+            <h2>Student Learning Portal</h2>
+            <p>Welcome! Sign in to continue your coding labs and earn verified skill XP.</p>
+          </div>
+
+          <div class="auth-tab-bar">
+            <button class="auth-tab-btn active" id="tab-student-signin-btn" type="button">Sign In</button>
+            <button class="auth-tab-btn" id="tab-student-signup-btn" type="button">Create Student Account</button>
+          </div>
+
+          <div id="student-auth-alert" class="alert-box" style="display: none;"></div>
+
+          <!-- SIGN IN FORM -->
+          <form id="form-student-login" class="auth-form" onsubmit="return false;">
+            <div class="form-group">
+              <label for="student-login-identifier">Email or Student ID</label>
+              <input type="text" id="student-login-identifier" class="form-control" placeholder="e.g. alex.vance@campus.edu or stu_alex_vance" autocomplete="username" value="alex.vance@campus.edu" required>
+            </div>
+            <div class="form-group">
+              <label for="student-login-password">Password</label>
+              <input type="password" id="student-login-password" class="form-control" placeholder="Enter your password" autocomplete="current-password" value="Student@Pass2026!" required>
+            </div>
+            <button type="submit" id="btn-submit-student-login" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.95rem; margin-top: 10px;">
+              Sign In to Learning Dashboard →
+            </button>
+            <div class="demo-creds-hint" style="margin-top: 14px; padding: 12px; background: rgba(79, 70, 229, 0.08); border: 1px solid var(--indigo-border); border-radius: var(--radius-md);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--indigo-primary);">💡 One-Click Demo Access:</span>
+                <span style="font-size: 0.72rem; color: var(--teal-success); font-weight: 600;">● Ready</span>
+              </div>
+              <button type="button" class="btn btn-secondary demo-autofill-btn" data-role="student" data-user="alex.vance@campus.edu" data-pass="Student@Pass2026!" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: center; background: #FFFFFF; font-weight: 600; color: var(--indigo-primary); border-color: var(--indigo-border);">
+                ⚡ Instant Login as Student (Alex Vance)
+              </button>
+              <div style="font-size: 0.72rem; color: var(--text-muted); text-align: center; margin-top: 6px;">
+                Credentials: <code>alex.vance@campus.edu</code> / <code>Student@Pass2026!</code>
+              </div>
+            </div>
+          </form>
+
+          <!-- SIGN UP FORM -->
+          <form id="form-student-register" class="auth-form" style="display: none;" onsubmit="return false;">
+            <div class="form-group">
+              <label for="student-reg-name">Display Name / Nickname</label>
+              <input type="text" id="student-reg-name" class="form-control" placeholder="e.g. Maya Lin" maxlength="80" required>
+            </div>
+            <div class="form-group">
+              <label for="student-reg-email">Campus / Student Email</label>
+              <input type="email" id="student-reg-email" class="form-control" placeholder="e.g. maya@campus.edu" maxlength="254" required>
+            </div>
+            <div class="form-group">
+              <label for="student-reg-password">Password</label>
+              <input type="password" id="student-reg-password" class="form-control" placeholder="Create a secure password (min 6 characters)" minlength="6" required>
+            </div>
+            <div class="form-group">
+              <label for="student-reg-class">Class Code (Optional)</label>
+              <select id="student-reg-class" class="form-control">
+                <option value="">None / Independent Learner</option>
+                <option value="cls_cs101">CS101: Systems &amp; Core Algorithms</option>
+                <option value="cls_web200">WEB200: Full-Stack Engineering &amp; Databases</option>
+              </select>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.45;">
+              🛡️ <em>Student accounts only. You will write all your own code. The AI tutor provides hints and questions without giving away answers.</em>
+            </div>
+            <button type="submit" id="btn-submit-student-register" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.95rem;">
+              Create Student Account &amp; Start
+            </button>
+          </form>
+
+          <div class="auth-card-footer">
+            <span>Course instructor or platform administrator?</span><br/>
+            <button id="link-to-admin-login" class="link-btn" type="button">Access Admin &amp; Teacher Portal →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 0B: SEPARATE ADMIN & TEACHER SIGN IN
+         ======================================================== -->
+    <section id="view-admin-login" class="view-section auth-view">
+      <div class="auth-card-container">
+        <div class="auth-card admin-auth-card">
+          <div class="auth-header">
+            <div class="brand-logo admin-logo" style="margin: 0 auto 12px; width: 48px; height: 48px; font-size: 1.4rem; background: var(--indigo-primary); color: #fff;">⚙️</div>
+            <h2>Admin &amp; Teacher Portal</h2>
+            <p>Authorized access for Site Owners and Class Instructors.</p>
+          </div>
+
+          <div id="admin-auth-alert" class="alert-box" style="display: none;"></div>
+
+          <form id="form-admin-login" class="auth-form" onsubmit="return false;">
+            <div class="form-group">
+              <label for="admin-login-identifier">Admin Email or ID</label>
+              <input type="text" id="admin-login-identifier" class="form-control" placeholder="e.g. owner@codemirror.local or admin" autocomplete="username" value="admin" required>
+            </div>
+            <div class="form-group">
+              <label for="admin-login-password">Password</label>
+              <input type="password" id="admin-login-password" class="form-control" placeholder="Enter admin password" autocomplete="current-password" value="Admin@Pass2026!" required>
+            </div>
+            <button type="submit" id="btn-submit-admin-login" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.95rem; margin-top: 10px;">
+              Sign In to Management Console →
+            </button>
+            <div class="demo-creds-hint" style="background: rgba(79, 70, 229, 0.08); border: 1px solid var(--indigo-border); border-radius: var(--radius-md); padding: 12px; margin-top: 14px;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--indigo-primary); margin-bottom: 8px;">👑 Quick Staff Demo:</div>
+              <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                <button type="button" class="btn btn-secondary demo-autofill-btn" data-role="admin" data-user="admin" data-pass="Admin@Pass2026!" style="flex: 1; font-size: 0.78rem; padding: 7px 6px; justify-content: center; background: #FFFFFF; font-weight: 600;">
+                  ⚡ Site Owner
+                </button>
+                <button type="button" class="btn btn-secondary demo-autofill-btn" data-role="admin" data-user="turing@campus.edu" data-pass="Teacher@Pass2026!" style="flex: 1; font-size: 0.78rem; padding: 7px 6px; justify-content: center; background: #FFFFFF; font-weight: 600;">
+                  ⚡ Teacher
+                </button>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); text-align: center;">Credentials: <code>admin</code> / <code>Admin@Pass2026!</code></div>
+            </div>
+          </form>
+
+          <div class="auth-card-footer">
+            <button id="link-to-student-login" class="link-btn" type="button">← Return to Student Sign In</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 1: LANGUAGE HOME PAGE (Catalog of Supported Languages)
+         ======================================================== -->
+    <main id="view-languages" class="view-section">
+      <div class="hero-card">
+        <div class="hero-content">
+          <div class="hero-subtitle">
+            <span>🚀</span> HANDS-ON BEGINNER CODING TUTOR
+          </div>
+          <h2>Master Programming Languages Step by Step.<br/>You Write Every Line. AI Guides Your Thinking.</h2>
+          <p class="hero-desc">
+            Explore every language page and see which tracks run in this server build. Our Socratic AI Coach
+            guides your problem solving with questions, edge-case hints, and syntax fundamentals.
+            The AI never writes or replaces your code—you build genuine engineering mastery.
+          </p>
+
+          <!-- Core Learning Rule Callout -->
+          <div style="background: rgba(79, 70, 229, 0.07); border: 1px solid var(--indigo-border); border-radius: var(--radius-md); padding: 12px 18px; max-width: 650px; margin-bottom: 20px; font-size: 0.84rem; color: var(--text-primary); line-height: 1.55;">
+            <strong>🛡️ Core Learning Rule:</strong> Students write every line of code. The AI is a supportive tutor, not a code generator.
+          </div>
+
+          <!-- Language Search and Filter Controls -->
+          <div class="catalog-controls" style="margin-top: 10px;">
+            <div class="search-input-wrapper">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="lang-search-input" class="search-input" placeholder="Search languages (e.g. Python, Java, SQL, C)...">
+            </div>
+            <div class="filter-bar">
+              <button class="filter-btn active" data-lang-filter="all">All Languages</button>
+              <button class="filter-btn" data-lang-filter="ready">Ready to Run</button>
+              <button class="filter-btn" data-lang-filter="beginner">Beginner Friendly</button>
+              <button class="filter-btn" data-lang-filter="interpreted">Interpreted</button>
+              <button class="filter-btn" data-lang-filter="compiled">Compiled</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Languages Cards Grid -->
+      <div class="language-grid" id="languages-grid-container">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </main>
+
+    <!-- ========================================================
+         VIEW 2: DEDICATED LANGUAGE PAGE (/languages/{lang_id})
+         ======================================================== -->
+    <section id="view-language-detail" class="view-section">
+      <div style="margin-bottom: 16px;">
+        <button class="btn btn-secondary" onclick="App.switchView('languages')" style="padding: 6px 14px; font-size: 0.82rem;">
+          ← Back to Languages Catalog
+        </button>
+      </div>
+
+      <div class="lang-detail-hero">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 3.2rem; line-height: 1;" id="detail-lang-icon">🐍</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: 2rem; font-weight: 800; color: var(--text-primary);" id="detail-lang-title">Python</h2>
+                <span class="diff-badge" id="detail-lang-diff">Beginner Friendly</span>
+                <span class="track-tag track-py" id="detail-lang-cat">Interpreted</span>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 0.94rem; margin-top: 4px; max-width: 650px;" id="detail-lang-desc">
+                Clean, readable syntax ideal for learning fundamental logic, data manipulation, and backend APIs.
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="detail-start-coding-btn" style="padding: 10px 20px;">
+              <span>⚡</span> Start Coding Now
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Toolchain Status Banner -->
+        <div class="lang-status-banner ready" id="detail-status-banner">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="detail-status-icon" style="font-size: 1.2rem;">●</span>
+            <div>
+              <strong id="detail-status-heading">Toolchain Ready:</strong>
+              <span id="detail-status-text">Native execution in isolated subprocess worker</span>
+            </div>
+          </div>
+          <span style="font-family: var(--font-mono); font-size: 0.78rem;" id="detail-status-version">Python 3.12</span>
+        </div>
+      </div>
+
+      <!-- Language Page Sub-Navigation -->
+      <div class="lang-subtabs">
+        <button class="lang-subtab-btn active" data-lang-tab="challenges">
+          <span>🎯</span> Lab Challenges (<span id="detail-challenges-count">2</span>)
+        </button>
+        <button class="lang-subtab-btn" data-lang-tab="lessons">
+          <span>📚</span> Beginner Lessons
+        </button>
+        <button class="lang-subtab-btn" data-lang-tab="examples">
+          <span>💡</span> Syntax &amp; Code Examples
+        </button>
+        <button class="lang-subtab-btn" data-lang-tab="setup">
+          <span>⚙️</span> Compiler Setup Guide
+        </button>
+      </div>
+
+      <!-- Pane 1: Lab Challenges -->
+      <div id="lang-pane-challenges" class="lang-pane active">
+        <div class="missions-grid" id="detail-challenges-grid">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Pane 2: Beginner Lessons -->
+      <div id="lang-pane-lessons" class="lang-pane">
+        <div id="detail-lessons-list">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Pane 3: Code Examples -->
+      <div id="lang-pane-examples" class="lang-pane">
+        <div id="detail-examples-list">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Pane 4: Compiler Setup -->
+      <div id="lang-pane-setup" class="lang-pane">
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); max-width: 800px;">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);" id="detail-setup-title">Compiler Setup</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;" id="detail-setup-text"></p>
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Verification Command:</div>
+          <div class="code-snippet-box" id="detail-setup-cmd">python --version</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 3: STUDENT DASHBOARD (CODE WIZARD)
+         ======================================================== -->
+    <section id="view-dashboard" class="view-section">
+      <!-- Code Wizard Header -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="font-size: 1.85rem; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+              Welcome to Code Wizard <span>🪄</span>
+            </h2>
+            <p style="color: var(--text-secondary); font-size: 0.95rem;">
+              Your interactive journey to programming mastery.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" onclick="App.handleContinueMission()" style="padding: 8px 18px; font-size: 0.88rem;">
+              <span>⚡</span> Continue Mission
+            </button>
+            <button class="btn btn-secondary" onclick="App.switchView('languages')" style="padding: 8px 16px; font-size: 0.88rem;">
+              <span>🌐</span> Languages
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 Hero Cards from Code Wizard reference -->
+      <div class="wizard-features-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <!-- Card 1: AI Mentor -->
+        <div class="wizard-feature-card" onclick="App.openWorkspaceAndAskCoach()" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 22px; cursor: pointer; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(99, 102, 241, 0.12); color: var(--indigo-primary); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            🪄
+          </div>
+          <div style="font-weight: 700; font-size: 1.12rem; color: var(--text-primary);">AI Mentor</div>
+          <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5;">
+            Chat with your Socratic AI programming assistant for instant guidance, debugging tips, and syntax assistance.
+          </div>
+          <div style="margin-top: auto; font-size: 0.8rem; font-weight: 700; color: var(--indigo-primary); display: flex; align-items: center; gap: 4px; padding-top: 6px;">
+            Chat with Mentor →
+          </div>
+        </div>
+
+        <!-- Card 2: Learn Coding -->
+        <div class="wizard-feature-card" onclick="App.switchView('languages')" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 22px; cursor: pointer; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: var(--teal-success); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            💻
+          </div>
+          <div style="font-weight: 700; font-size: 1.12rem; color: var(--text-primary);">Learn Coding</div>
+          <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5;">
+            Structured learning paths for 5+ popular programming languages: Python, JavaScript, Java, C, C++, SQL, HTML/CSS.
+          </div>
+          <div style="margin-top: auto; font-size: 0.8rem; font-weight: 700; color: var(--teal-success); display: flex; align-items: center; gap: 4px; padding-top: 6px;">
+            Browse Languages →
+          </div>
+        </div>
+
+        <!-- Card 3: Build Projects -->
+        <div class="wizard-feature-card" onclick="App.switchView('missions')" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 22px; cursor: pointer; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(217, 119, 6, 0.12); color: var(--amber-hint); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            🚀
+          </div>
+          <div style="font-weight: 700; font-size: 1.12rem; color: var(--text-primary);">Build Projects</div>
+          <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5;">
+            Apply your knowledge to guided lab challenges, run against automated test cases, and earn audited XP badges.
+          </div>
+          <div style="margin-top: auto; font-size: 0.8rem; font-weight: 700; color: var(--amber-hint); display: flex; align-items: center; gap: 4px; padding-top: 6px;">
+            Browse All Labs →
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-content">
+          <div class="hero-subtitle">
+            <span>📊</span> STUDENT PROGRESS &amp; MASTERY
+          </div>
+          <h2>Continue Your Mission.<br/>Level Up Your Skills.</h2>
+          <p class="hero-desc">
+            Review completed challenges, derived player levels, and track your verified coding milestones.
+          </p>
+
+          <!-- Level Progress Bar -->
+          <div class="level-progress-container">
+            <div class="level-progress-top">
+              <span style="color: var(--text-primary); font-weight: 700;" id="dash-level-label">Level 1: Explorer</span>
+              <span style="color: var(--indigo-primary);" id="dash-xp-progress-text">0 / 300 XP to Level 2</span>
+            </div>
+            <div class="progress-bar-bg" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar-fill" id="dash-xp-progress-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="hero-continue-btn" onclick="App.handleContinueMission()">
+              <span>⚡</span> Continue Mission
+            </button>
+            <button class="btn btn-secondary" onclick="App.switchView('languages')">
+              <span>🌐</span> Browse Languages
+            </button>
+          </div>
+
+          <!-- Toolchains Health -->
+          <div class="runtime-bar" id="dashboard-runtime-bar">
+            <strong style="color: var(--text-primary); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;">Host Toolchains:</strong>
+            <div class="runtime-item" id="rt-py"><span class="status-dot active"></span> <span>Python 3 (Sandbox Ready)</span></div>
+            <div class="runtime-item" id="rt-sql"><span class="status-dot active"></span> <span>SQLite (Active)</span></div>
+            <div class="runtime-item" id="rt-html"><span class="status-dot active"></span> <span>HTML/CSS (Ready)</span></div>
+            <div class="runtime-item" id="rt-js"><span class="status-dot inactive"></span> <span>Node.js (Checking...)</span></div>
+            <div class="runtime-item" id="rt-java"><span class="status-dot inactive"></span> <span>Java JDK (Checking...)</span></div>
+            <div class="runtime-item" id="rt-c"><span class="status-dot inactive"></span> <span>GCC / Clang (Checking...)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(15, 159, 130, 0.12); color: var(--teal-success);">🎯</div>
+          <div class="stat-info">
+            <div class="num" id="dash-readiness-val">Lvl 1</div>
+            <div class="label">Derived Player Level</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(79, 70, 229, 0.12); color: var(--indigo-primary);">🏆</div>
+          <div class="stat-info">
+            <div class="num" id="dash-completed-count">0</div>
+            <div class="label">Completed Labs</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(217, 119, 6, 0.12); color: var(--amber-hint);">🛡️</div>
+          <div class="stat-info">
+            <div class="num" id="dash-evidence-count">0</div>
+            <div class="label">Verified Proofs</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: rgba(79, 70, 229, 0.12); color: var(--indigo-primary);">⭐</div>
+          <div class="stat-info">
+            <div class="num" id="dash-points-val">0</div>
+            <div class="label">Audited XP Points</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Two column dashboard layout -->
+      <div class="dashboard-grid">
+        <!-- Suggested Next Challenge -->
+        <div class="glass-panel">
+          <div class="card-header">
+            <h3><span>📂</span> Suggested Next Challenge</h3>
+            <span class="diff-badge" style="color: var(--teal-success); background: var(--teal-light);">Ready to Code</span>
+          </div>
+          <div class="card-body">
+            <div style="padding: 16px; background: #F5F7FF; border-radius: var(--radius-md); border: 1px solid var(--indigo-border);">
+              <div style="font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; color: var(--indigo-primary); text-transform: uppercase;">
+                Target Mission:
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <strong id="rec-mission-title" style="color: var(--text-primary); font-size: 0.96rem;">REST API Endpoint: Category &amp; Status Filtering</strong>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);" id="rec-mission-track">Python Backend (+75 XP)</div>
+                </div>
+                <button id="rec-mission-btn" class="btn btn-primary" style="padding: 7px 16px; font-size: 0.82rem;">
+                  Launch Lab →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed Challenges List -->
+        <div class="glass-panel">
+          <div class="card-header">
+            <h3><span>🏆</span> Completed Labs</h3>
+          </div>
+          <div class="card-body" style="padding: 16px 20px;">
+            <div id="dash-completed-list" style="font-size: 0.86rem; color: var(--text-secondary);">
+              <div style="text-align: center; padding: 24px 0; color: var(--text-muted);">
+                No completed labs yet. Launch your first mission above!
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 4: ALL LABS CATALOG
+         ======================================================== -->
+    <section id="view-missions" class="view-section">
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 6px; color: var(--text-primary);">All Coding Labs &amp; Tracks</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+          Select a coding challenge. Read the 7-step pedagogical lab guide, choose your programming language, request progressive AI hints, and verify your code in the isolated sandbox.
+        </p>
+      </div>
+
+      <div class="catalog-controls">
+        <div class="search-input-wrapper">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="challenge-search-input" class="search-input" placeholder="Search challenges by title, skill, or keyword...">
+        </div>
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all">All Challenges</button>
+          <button class="filter-btn" data-filter="python">Python</button>
+          <button class="filter-btn" data-filter="sql">SQL</button>
+          <button class="filter-btn" data-filter="html">HTML &amp; CSS</button>
+          <button class="filter-btn" data-filter="javascript">JavaScript</button>
+          <button class="filter-btn" data-filter="java">Java</button>
+          <button class="filter-btn" data-filter="c">C Systems</button>
+          <button class="filter-btn" data-filter="cpp">C++ Algorithms</button>
+        </div>
+      </div>
+
+      <div class="missions-grid" id="missions-grid-container">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 5: CODING WORKSPACE & SOCRATIC TUTOR
+         ======================================================== -->
+    <section id="view-workspace" class="view-section" style="padding-bottom: 10px;">
+      <div class="workspace-container">
+        <!-- Left Sidebar: Project File Explorer -->
+        <aside class="workspace-sidebar">
+          <div class="file-tree-header">
+            <span>Project Explorer</span>
+            <span style="color: var(--indigo-primary); font-size: 0.72rem; font-weight: 700;">CAMPUS PORTAL</span>
+          </div>
+
+          <ul class="file-tree-list">
+            <li class="file-item active" onclick="App.openMission('ch_py_filter')">
+              <span>📄</span> api_filter.py
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_sql_search')">
+              <span>📄</span> search_query.sql
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_web_validator')">
+              <span>📄</span> validator.py
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_c_bounds')">
+              <span>📄</span> attendee_processor.py
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_cpp_binary_search')">
+              <span>📄</span> binary_search.py
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_java_grade_calculator')">
+              <span>📄</span> GradeAverage.java
+            </li>
+            <li class="file-item" onclick="App.openMission('ch_html_profile_card')">
+              <span>📄</span> profile_card.html
+            </li>
+          </ul>
+
+          <!-- Host Runtime Warning banner -->
+          <div id="runtime-warning-banner" style="display: none; padding: 12px 14px; background: var(--amber-light); border-top: 1px solid var(--amber-border); font-size: 0.78rem; color: #78350F; line-height: 1.45;">
+            ⚠️ <strong id="runtime-warning-title">Runtime Notice:</strong> <span id="runtime-warning-text"></span>
+          </div>
+
+          <!-- Architecture Impact View -->
+          <div class="impact-panel">
+            <div class="impact-title">
+              <span>⚡</span> Architecture Impact
+            </div>
+            <div class="impact-content" id="impact-summary-text">
+              Impacts: Project source modules, testing harness, and student XP ledger.
+            </div>
+          </div>
+        </aside>
+
+        <!-- Center: Monaco Editor Panel -->
+        <main class="editor-panel">
+          <div class="editor-toolbar">
+            <div class="editor-tabs">
+              <div class="tab-pill">
+                <span>📝</span> <span id="current-file-tab">api_filter.py</span>
+              </div>
+              <div class="lang-select-wrapper">
+                <label for="editor-language-select" style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">Language:</label>
+                <select id="editor-language-select" class="lang-select" aria-label="Select Programming Language">
+                  <option value="python">Python 3 (Sandbox Ready)</option>
+                  <option value="sql">SQL (SQLite In-Memory)</option>
+                  <option value="html">HTML &amp; CSS (Browser Preview)</option>
+                  <option value="javascript">JavaScript (runner not supported yet)</option>
+                  <option value="java">Java (runner not supported yet)</option>
+                  <option value="c">C (runner not supported yet)</option>
+                  <option value="cpp">C++ (runner not supported yet)</option>
+                </select>
+                <span id="editor-runtime-badge" class="stat-pill" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; background: rgba(15, 159, 130, 0.12); color: var(--teal-success);">
+                  ● Ready
+                </span>
+              </div>
+            </div>
+
+            <div class="editor-actions">
+              <!-- Notice: Solution cheat button is removed per Core Learning Rule -->
+              <button id="reset-code-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.78rem;" title="Reset code back to starter template">
+                <span>↻</span> Reset
+              </button>
+              <button id="save-code-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.78rem;" title="Save draft locally">
+                <span>💾</span> Save
+              </button>
+              <button id="run-tests-btn" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" title="Run tests in sandbox">
+                <span>▶</span> Run Tests
+              </button>
+              <button id="submit-mission-btn" class="btn btn-success" style="padding: 6px 14px; font-size: 0.82rem;" title="Submit verified solution and claim XP">
+                <span>🛡️</span> Submit
+              </button>
+            </div>
+          </div>
+
+          <div class="editor-canvas">
+            <div id="monaco-container"></div>
+            <textarea id="fallback-editor" spellcheck="false" placeholder="Loading file content..."></textarea>
+          </div>
+
+          <!-- Custom Program Input Area -->
+          <div class="custom-input-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Program Custom Input (stdin / arguments):</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">Optional custom test parameters</span>
+            </div>
+            <textarea id="custom-input-text" rows="2" class="form-control" style="font-family: var(--font-mono); font-size: 0.8rem; resize: vertical;" placeholder="Enter custom arguments or test cases here (optional)..."></textarea>
+          </div>
+        </main>
+
+        <!-- Right Panel: Tabs for "Run & Output", "AI Coach", and "7-Step Lab Guide" -->
+        <aside class="workspace-right">
+          <div class="right-tab-bar">
+            <button class="right-tab-btn active" data-tab="output">
+              <span>▶</span> Run &amp; Output
+            </button>
+            <button class="right-tab-btn" data-tab="coach">
+              <span>🤖</span> AI Coach
+            </button>
+            <button class="right-tab-btn" data-tab="guide">
+              <span>📋</span> Lab Guide
+            </button>
+          </div>
+
+          <div class="tab-content-area">
+            <!-- TAB 1: RUN & OUTPUT -->
+            <div id="tab-pane-output" class="right-tab-pane active">
+              <div id="test-summary-box" style="display: none;"></div>
+
+              <!-- Test Results / Sandbox Output -->
+              <div id="test-results-container">
+                <div style="text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.86rem;">
+                  Click <strong>▶ Run Tests</strong> above to execute automated validation inside the isolated sandbox.
+                </div>
+              </div>
+
+              <!-- HTML Live Preview (Rendered when language is HTML) -->
+              <div id="html-preview-container" class="html-preview-container" style="display: none;">
+                <div class="html-preview-header">
+                  <span>🌐 Live Browser Preview</span>
+                  <span style="color: var(--teal-success);">Sandboxed Frame</span>
+                </div>
+                <iframe id="html-preview-frame" class="html-preview-frame" sandbox="allow-scripts"></iframe>
+              </div>
+
+              <!-- Post-Challenge Concept Recap & Next Practice Recommendation -->
+              <div id="concept-recap-container" style="display: none;">
+                <div class="concept-recap-box">
+                  <h4><span>💡</span> Concept Recap</h4>
+                  <p id="concept-recap-text">
+                    Great work! You validated input constraints and guarded against boundary conditions.
+                  </p>
+                </div>
+
+                <div class="related-challenge-card" id="related-challenge-card">
+                  <div>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--indigo-primary); text-transform: uppercase;">
+                      Suggested Next Practice:
+                    </div>
+                    <strong id="related-challenge-title" style="font-size: 0.88rem; color: var(--text-primary);">
+                      Database Search &amp; Ordering Query
+                    </strong>
+                  </div>
+                  <button id="related-challenge-btn" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.78rem;">
+                    Practice Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 2: SOCRATIC AI COACH -->
+            <div id="tab-pane-coach" class="right-tab-pane">
+              <!-- Socratic Tutor Notice -->
+              <div style="background: var(--indigo-light); border: 1px solid var(--indigo-border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: var(--text-secondary);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                  <strong style="color: var(--indigo-primary); font-size: 0.82rem;">🪄 AI Mentor (Socratic Mode):</strong>
+                  <div id="coach-service-status" role="status" style="font-weight: 700; font-size: 0.72rem;">Checking AI service…</div>
+                </div>
+                <span>You write all the code. I guide your thinking with conceptual questions and syntax examples without giving away answers.</span>
+              </div>
+
+              <!-- Progressive Hint Stepper -->
+              <div class="hint-stepper" style="margin-bottom: 10px;">
+                <button class="hint-step-btn unlocked" data-level="1">1: Question</button>
+                <button class="hint-step-btn" data-level="2">2: Clue</button>
+                <button class="hint-step-btn" data-level="3">3: Explanation</button>
+              </div>
+
+              <div class="hint-box" style="margin-bottom: 14px;">
+                <h4 id="hint-level-title">Step 1: Guided Question</h4>
+                <p id="hint-content-text">Loading progressive guidance...</p>
+              </div>
+
+              <!-- Contextual Q&A Chat -->
+              <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: var(--indigo-primary);">
+                    💬 Chat with AI Mentor
+                  </div>
+                  <button type="button" class="btn btn-secondary" onclick="App.clearCoachChat()" style="padding: 2px 8px; font-size: 0.7rem;">Clear</button>
+                </div>
+                <div id="coach-chat-history" style="max-height: 220px; overflow-y: auto; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px;"></div>
+
+                <!-- Quick Prompt Chips -->
+                <div class="chat-reaction-pills" style="margin-bottom: 10px;">
+                  <button type="button" class="reaction-pill-btn" onclick="App.quickAskCoach('What is the goal of this lab?')">🎯 Goal</button>
+                  <button type="button" class="reaction-pill-btn" onclick="App.quickAskCoach('What edge cases should I consider?')">⚠️ Edge Cases</button>
+                  <button type="button" class="reaction-pill-btn" onclick="App.quickAskCoach('Can you explain the syntax rule for this problem?')">📝 Syntax</button>
+                  <button type="button" class="reaction-pill-btn" onclick="App.quickAskCoach('Why is my code failing? Please give me a clue.')">🔍 Debug</button>
+                </div>
+
+                <div class="coach-chat-input" style="display: flex; gap: 6px;">
+                  <input type="text" id="coach-question-input" class="coach-input" placeholder="Ask AI Mentor a question..." style="flex: 1;">
+                  <button id="coach-ask-btn" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.82rem;">
+                    Ask
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 3: 7-STEP LAB TEACHING GUIDE -->
+            <div id="tab-pane-guide" class="right-tab-pane">
+              <div style="margin-bottom: 14px;">
+                <span class="track-tag track-py" id="workspace-mission-track">Python Backend</span>
+                <h3 id="workspace-mission-title" style="font-size: 1.15rem; margin-top: 8px; color: var(--text-primary);">
+                  REST API Endpoint: Category &amp; Status Filtering
+                </h3>
+              </div>
+
+              <p id="mission-scenario-text" style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
+                Scenario text...
+              </p>
+
+              <!-- 7-Step Pedagogical Teaching Flow -->
+              <div class="teaching-flow-container">
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">1</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Restate the Goal</div>
+                    <div class="teaching-step-desc" id="guide-step-1">Summarize what the program must accomplish in your own words.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">2</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Inputs, Outputs &amp; Constraints</div>
+                    <div class="teaching-step-desc" id="guide-step-2">Identify incoming arguments, expected return formats, and time limits.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">3</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Sample Run &amp; Edge Cases</div>
+                    <div class="teaching-step-desc" id="guide-step-3">Consider empty lists, None values, whitespace strings, and zero bounds.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">4</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Plain-Language Steps</div>
+                    <div class="teaching-step-desc" id="guide-step-4">1. Validate inputs. 2. Initialize accumulator. 3. Loop and evaluate. 4. Return result.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">5</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Write Your Implementation</div>
+                    <div class="teaching-step-desc">Write your complete solution code in the editor on the left.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">6</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Run &amp; Inspect Errors</div>
+                    <div class="teaching-step-desc">Click "▶ Run Tests", read compiler/assertion output, and refine your logic.</div>
+                  </div>
+                </div>
+
+                <div class="teaching-step-card">
+                  <div class="teaching-step-num">7</div>
+                  <div class="teaching-step-content">
+                    <div class="teaching-step-title">Concept Recap &amp; Practice</div>
+                    <div class="teaching-step-desc">Upon passing, review the key takeaway and proceed to a related lab!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 6: SKILLPROOF DASHBOARD
+         ======================================================== -->
+    <section id="view-skillproof" class="view-section">
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 6px; color: var(--text-primary);">SkillProof™ Evidence Registry</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+          Tamper-proof, auditable proof of practical computer science skills. Every record links directly to verified sandbox executions and immutable XP ledger entries.
+        </p>
+      </div>
+
+      <div class="skill-badges-grid" id="skill-badges-container">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 7: LEARNING REPORT (Printable)
+         ======================================================== -->
+    <section id="view-report" class="view-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary);">Official Learning &amp; Skill Report</h2>
+          <p style="color: var(--text-secondary); font-size: 0.88rem;">Shareable progress summary based on completed challenges and verified test evidence.</p>
+        </div>
+        <button id="print-report-btn" class="btn btn-primary">
+          <span>🖨️</span> Print / Export PDF
+        </button>
+      </div>
+
+      <div class="report-paper">
+        <div class="report-header">
+          <div>
+            <h2>CodeMirror 2.0 Skill Dossier</h2>
+            <div style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">AI-Powered Project-Based Learning System</div>
+          </div>
+          <div style="text-align: right; font-size: 0.85rem; color: #475569;">
+            <div><strong>Student ID:</strong> <span id="report-student-id">stu_alex_vance</span></div>
+            <div><strong>Moniker:</strong> <span id="report-student-name">PixelPioneer</span></div>
+            <div><strong>Issued:</strong> <span id="report-date">Nov 4, 2026</span></div>
+          </div>
+        </div>
+
+        <p style="font-size: 0.92rem; color: #334155; line-height: 1.6; margin-bottom: 20px;">
+          This official document certifies verified mastery of practical computer science and software development skills through project-driven missions, automated sandbox test executions, and technical explanations.
+        </p>
+
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Challenge Title</th>
+              <th>Skill Track</th>
+              <th>Difficulty</th>
+              <th>XP Awarded</th>
+              <th>Verification Status</th>
+            </tr>
+          </thead>
+          <tbody id="report-tasks-tbody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+
+        <div class="report-footer">
+          <div>
+            <strong>Verified By:</strong> CodeMirror 2.0 Automated Sandbox &amp; XP Ledger
+          </div>
+          <div>
+            Verification Seal: CM2-AUDIT-VERIFIED
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 8: SITE OWNER & ADMIN CONSOLE
+         ======================================================== -->
+    <section id="view-admin" class="view-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary);" id="admin-view-title">Site Owner &amp; Admin Console</h2>
+          <p style="color: var(--text-secondary); font-size: 0.92rem;" id="admin-view-subtitle">Manage coding challenges, classes, student rosters, learning analytics, and platform configurations.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-admin-export" class="btn btn-secondary">
+            <span>💾</span> Export Platform JSON
+          </button>
+          <button id="btn-admin-create-ch" class="btn btn-primary">
+            <span>+</span> Create New Lab
+          </button>
+        </div>
+      </div>
+
+      <!-- Admin Tab Navigation -->
+      <div class="admin-tab-bar">
+        <button class="admin-nav-btn active" data-admin-tab="overview">
+          <span>📈</span> Learning Analytics
+        </button>
+        <button class="admin-nav-btn" data-admin-tab="challenges">
+          <span>🎯</span> Lab Manager
+        </button>
+        <button class="admin-nav-btn" data-admin-tab="classes">
+          <span>👥</span> Classes &amp; Students
+        </button>
+        <button class="admin-nav-btn" data-admin-tab="settings" id="admin-settings-tab-btn">
+          <span>⚙️</span> Platform Settings &amp; XP
+        </button>
+      </div>
+
+      <!-- PANE 1: OVERVIEW & ANALYTICS -->
+      <div id="admin-pane-overview" class="admin-pane active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(79, 70, 229, 0.12); color: var(--indigo-primary);">👥</div>
+            <div class="stat-info">
+              <div class="num" id="admin-total-students">0</div>
+              <div class="label">Enrolled Students</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(15, 159, 130, 0.12); color: var(--teal-success);">🏫</div>
+            <div class="stat-info">
+              <div class="num" id="admin-total-classes">0</div>
+              <div class="label">Active Classes</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(217, 119, 6, 0.12); color: var(--amber-hint);">📝</div>
+            <div class="stat-info">
+              <div class="num" id="admin-total-attempts">0</div>
+              <div class="label">Sandbox Attempts</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(15, 159, 130, 0.12); color: var(--teal-success);">✅</div>
+            <div class="stat-info">
+              <div class="num" id="admin-pass-rate">0%</div>
+              <div class="label">Attempt Pass Rate</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- Common Error Topics -->
+          <div class="glass-panel">
+            <div class="card-header">
+              <h3><span>⚠️</span> Common Student Error Topics</h3>
+              <span class="diff-badge" style="color: var(--amber-hint); background: var(--amber-light);">Real-time Telemetry</span>
+            </div>
+            <div class="card-body">
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">
+                Identified from sandbox test runs to help instructors and AI coaches provide targeted debugging intervention.
+              </p>
+              <div id="admin-common-errors-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick System Diagnostics -->
+          <div class="glass-panel">
+            <div class="card-header">
+              <h3><span>🛡️</span> Security &amp; Compliance</h3>
+            </div>
+            <div class="card-body">
+              <ul style="list-style: none; font-size: 0.86rem; color: var(--text-secondary);">
+                <li style="padding: 10px 0; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between;">
+                  <span>Student PII Protection</span>
+                  <strong style="color: var(--teal-success);">Enforced (Pseudonymous)</strong>
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between;">
+                  <span>Sandbox Isolation</span>
+                  <strong style="color: var(--teal-success);">Active (Subprocess)</strong>
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between;">
+                  <span>Private Test Secrecy</span>
+                  <strong style="color: var(--teal-success);">Server-side Only</strong>
+                </li>
+                <li style="padding: 10px 0; display: flex; justify-content: space-between;">
+                  <span>Anti-Farming XP Ledger</span>
+                  <strong style="color: var(--teal-success);">Single-Award Rule</strong>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 2: LAB MANAGER -->
+      <div id="admin-pane-challenges" class="admin-pane">
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Coding Labs Roster</h3>
+            <span style="font-size: 0.85rem; color: var(--text-secondary);" id="admin-challenges-count">7 labs total</span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title &amp; ID</th>
+                  <th>Track / Skill</th>
+                  <th>Difficulty</th>
+                  <th>XP Reward</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-challenges-tbody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 3: CLASSES & STUDENTS -->
+      <div id="admin-pane-classes" class="admin-pane">
+        <div id="admin-classes-container">
+          <!-- Rendered dynamically with class cards and student tables -->
+        </div>
+      </div>
+
+      <!-- PANE 4: SETTINGS & XP CONFIGURATION -->
+      <div id="admin-pane-settings" class="admin-pane">
+        <div style="max-width: 720px; background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-sm);">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">Platform &amp; Coaching Configuration</h3>
+          <p style="font-size: 0.86rem; color: var(--text-secondary); margin-bottom: 22px;">Configure XP leveling thresholds, AI coaching behavior, and system maintenance controls.</p>
+
+          <form id="admin-settings-form" onsubmit="return false;">
+            <div class="form-group">
+              <label for="cfg-platform-name">Platform Title:</label>
+              <input type="text" id="cfg-platform-name" class="form-control" value="CodeMirror 2.0 - Beginner Coding Tutor">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label for="cfg-xp-per-level">XP Multiplier Per Level:</label>
+                <input type="number" id="cfg-xp-per-level" class="form-control" value="100" min="1" step="10">
+              </div>
+              <div class="form-group">
+                <label for="cfg-max-hints">Max Hints Allowed:</label>
+                <input type="number" id="cfg-max-hints" class="form-control" value="3" min="1" max="5">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cfg-ai-guidance">AI Debug Coach Guidance Prompt:</label>
+              <textarea id="cfg-ai-guidance" rows="3" class="form-control" style="resize: vertical;">The student must write every line of code. Never generate or insert the solution. Always provide progressive guidance: question first, then conceptual clue, then explanation.</textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Website Colors</label>
+              <div class="theme-color-grid">
+                <label for="cfg-theme-primary">Buttons and links<input id="cfg-theme-primary" type="color" value="#4F46E5"></label>
+                <label for="cfg-theme-background">Page background<input id="cfg-theme-background" type="color" value="#F7F8FC"></label>
+                <label for="cfg-theme-surface">Cards and panels<input id="cfg-theme-surface" type="color" value="#FFFFFF"></label>
+                <label for="cfg-theme-text">Main text<input id="cfg-theme-text" type="color" value="#1B2230"></label>
+              </div>
+              <small>Saved colors apply across the student website.</small>
+            </div>
+
+            <div class="form-group" style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 0.88rem; color: var(--text-primary);">Save System Settings</strong>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Applies changes immediately to the live server.</div>
+              </div>
+              <button id="btn-save-settings" class="btn btn-primary">
+                <span>💾</span> Save Settings
+              </button>
+            </div>
+          </form>
+
+          <!-- Danger Zone: Reset & Cleanup -->
+          <div style="margin-top: 36px; padding: 20px; border: 1px solid var(--red-border); background: var(--red-light); border-radius: var(--radius-md);">
+            <h4 style="color: var(--red-error); font-size: 0.95rem; margin-bottom: 6px;">⚠️ Data Management &amp; Retention Cleanup</h4>
+            <p style="font-size: 0.82rem; color: #991B1B; margin-bottom: 14px;">Clean sandbox test attempt history or reset demo student state.</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button id="btn-cleanup-attempts" class="btn btn-danger" style="font-size: 0.8rem; padding: 6px 12px;">
+                Clear Attempt Logs
+              </button>
+              <button id="reset-demo-btn" class="btn btn-secondary" style="font-size: 0.8rem; padding: 6px 12px;">
+                Reset Demo State
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: OWNER STUDENT PROFILE EDITOR -->
+  <div class="modal-overlay" id="modal-student-editor" role="dialog" aria-modal="true" aria-labelledby="modal-student-title">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="modal-student-title">Edit Student Profile</h3>
+        <button class="btn btn-secondary" id="modal-student-close-btn" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="student-edit-form" onsubmit="return false;">
+          <input type="hidden" id="edit-student-id">
+          <div class="form-group"><label for="edit-student-name">Display name</label><input id="edit-student-name" class="form-control" maxlength="80" required></div>
+          <div class="form-group"><label for="edit-student-email">Email</label><input id="edit-student-email" type="email" class="form-control" maxlength="254" required></div>
+          <div class="form-group"><label for="edit-student-class">Class</label><select id="edit-student-class" class="form-control"></select></div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+            <button class="btn btn-secondary" id="modal-student-cancel-btn" type="button">Cancel</button>
+            <button class="btn btn-primary" id="modal-student-save-btn" type="button">Save student</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: LAB CREATE / EDIT -->
+  <div class="modal-overlay" id="modal-challenge-editor" role="dialog" aria-modal="true" aria-labelledby="modal-ch-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-ch-title">Create / Edit Coding Lab</h3>
+        <button class="btn btn-secondary" id="modal-ch-close-btn" style="padding: 4px 8px; font-size: 0.8rem;">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="challenge-edit-form" onsubmit="return false;">
+          <input type="hidden" id="edit-ch-mode" value="create">
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label for="edit-ch-id">Lab ID:</label>
+              <input type="text" id="edit-ch-id" class="form-control" placeholder="e.g. ch_py_custom_filter" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-ch-title">Title:</label>
+              <input type="text" id="edit-ch-title" class="form-control" placeholder="e.g. Data Filter" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label for="edit-ch-skill">Track / Skill Tag:</label>
+              <input type="text" id="edit-ch-skill" class="form-control" placeholder="python-backend, sql, java, etc." value="python-backend">
+            </div>
+            <div class="form-group">
+              <label for="edit-ch-diff">Difficulty:</label>
+              <select id="edit-ch-diff" class="form-control">
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate" selected>Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="edit-ch-xp">XP Reward:</label>
+              <input type="number" id="edit-ch-xp" class="form-control" value="75" min="10" step="5">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-ch-language">Runnable language:</label>
+            <select id="edit-ch-language" class="form-control">
+              <option value="python">Python</option>
+              <option value="sql">SQL (SQLite)</option>
+              <option value="html">HTML &amp; CSS</option>
+            </select>
+            <small>Only execution adapters currently available in this project are listed.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-ch-prompt">Lab Problem &amp; Requirements:</label>
+            <textarea id="edit-ch-prompt" rows="3" class="form-control" placeholder="Describe the problem, input parameters, and expected return value..." required></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label for="edit-ch-recap">Concept Recap (Post-Submission):</label>
+              <textarea id="edit-ch-recap" rows="2" class="form-control" placeholder="Key concepts to reinforce after student passes..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="edit-ch-related">Related Practice Lab ID:</label>
+              <input type="text" id="edit-ch-related" class="form-control" placeholder="e.g. ch_sql_search">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-ch-starter">Starter Code Template:</label>
+            <textarea id="edit-ch-starter" rows="5" class="form-control" style="font-family: var(--font-mono); font-size: 0.8rem;" required></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-ch-cancel-btn" class="btn btn-secondary">Cancel</button>
+        <button id="modal-ch-save-btn" class="btn btn-primary">Save Lab</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monaco Editor AMD Loader from CDN with fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <script>
+    if (window.require) {
+      window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+    }
+  </script>
+  <script src="/static/js/particles.js?v=20261105_4"></script>
+  <script src="/static/js/api.js?v=20261105_4"></script>
+  <script src="/static/js/editor.js?v=20261105_4"></script>
+  <script src="/static/js/app.js?v=20261105_4"></script>
+</body>
+</html>
