@@ -5,6 +5,13 @@
  */
 
 const API = {
+  isStaticHost() {
+    return Boolean(window.StaticEngine) && (
+      window.location.hostname.endsWith('github.io') ||
+      window.location.protocol === 'file:'
+    );
+  },
+
   // Session & Authentication Storage
   getToken() {
     return localStorage.getItem('cm_session_token');
@@ -67,6 +74,11 @@ const API = {
 
   // 1. Authentication Endpoints
   async login(identifier, password) {
+    if (this.isStaticHost()) {
+      const data = window.StaticEngine.login(identifier, password);
+      this.setSession(data.token, data.account);
+      return data;
+    }
     const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -81,6 +93,11 @@ const API = {
   },
 
   async registerStudent(displayName, email, password, classId = null) {
+    if (this.isStaticHost()) {
+      const data = window.StaticEngine.registerStudent(displayName, email, password, classId);
+      this.setSession(data.token, data.account);
+      return data;
+    }
     const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,13 +117,15 @@ const API = {
   },
 
   async logout() {
-    try {
-      await fetch('/api/v1/auth/logout', {
-        method: 'POST',
-        headers: this.getHeaders()
-      });
-    } catch (e) {
-      console.warn('Logout error', e);
+    if (!this.isStaticHost()) {
+      try {
+        await fetch('/api/v1/auth/logout', {
+          method: 'POST',
+          headers: this.getHeaders()
+        });
+      } catch (e) {
+        console.warn('Logout error', e);
+      }
     }
     this.clearSession();
     return { status: 'success' };
@@ -115,6 +134,11 @@ const API = {
   async getMyProfile() {
     if (!this.getToken() && !this.getAccountId()) {
       throw new Error('Unauthorized or session expired');
+    }
+    if (this.isStaticHost()) {
+      const u = this.getStoredUser();
+      if (!u) throw new Error('Unauthorized or session expired');
+      return { account: u };
     }
     const res = await fetch('/api/v1/auth/me', { headers: this.getHeaders() });
     if (!res.ok) {
@@ -129,29 +153,34 @@ const API = {
   },
 
   async getAccounts() {
+    if (this.isStaticHost()) return { accounts: Object.values(window.StaticEngine.getAccountsMap()) };
     const res = await fetch('/api/v1/auth/accounts');
     return await res.json();
   },
 
   // 2. Health & Runtimes check
   async getHealth() {
+    if (this.isStaticHost()) return { status: 'ok', service: 'student-coding-quest-static' };
     const res = await fetch('/health');
     return await res.json();
   },
 
   async getRuntimes() {
+    if (this.isStaticHost()) return window.StaticEngine.getRuntimes();
     const res = await fetch('/api/v1/runtimes');
     if (!res.ok) throw new Error('Failed to fetch runtime status');
     return await res.json();
   },
 
   async getAIStatus() {
+    if (this.isStaticHost()) return window.StaticEngine.getAIStatus();
     const res = await fetch('/api/v1/ai-status');
     if (!res.ok) throw new Error('Could not read AI service status.');
     return await res.json();
   },
 
   async getSiteConfig() {
+    if (this.isStaticHost()) return window.StaticEngine.getSiteConfig();
     const res = await fetch('/api/v1/site-config');
     if (!res.ok) throw new Error('Could not load site appearance settings.');
     return await res.json();
@@ -159,12 +188,14 @@ const API = {
 
   // 1b. Languages Catalog & Detailed Curriculum
   async getLanguages() {
+    if (this.isStaticHost()) return window.StaticEngine.getLanguages();
     const res = await fetch('/api/v1/languages', { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch languages catalog');
     return await res.json();
   },
 
   async getLanguageDetails(langId) {
+    if (this.isStaticHost()) return window.StaticEngine.getLanguageDetails(langId);
     const res = await fetch(`/api/v1/languages/${langId}`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error(`Failed to load details for ${langId}`);
     return await res.json();
@@ -172,6 +203,7 @@ const API = {
 
   // 3. Mission catalog (tests are private to server)
   async getChallenges(skill = null, level = null) {
+    if (this.isStaticHost()) return window.StaticEngine.getChallenges();
     let url = '/api/v1/challenges';
     const params = new URLSearchParams();
     if (skill) params.append('skill', skill);
@@ -184,6 +216,7 @@ const API = {
   },
 
   async getChallenge(challengeId) {
+    if (this.isStaticHost()) return window.StaticEngine.getChallenge(challengeId);
     const res = await fetch(`/api/v1/challenges/${challengeId}`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load challenge details');
     return await res.json();
@@ -191,6 +224,9 @@ const API = {
 
   // 4. Isolated sandbox attempt submission (transactional XP rewards)
   async submitAttempt(challengeId, code, language = 'python') {
+    if (this.isStaticHost()) {
+      return window.StaticEngine.submitAttempt(challengeId, code, language, this.getAccountId());
+    }
     const res = await fetch('/api/v1/attempts', {
       method: 'POST',
       headers: this.getHeaders(),
@@ -209,6 +245,7 @@ const API = {
 
   // 5. Staged progressive hints (Question -> Clue -> Explanation)
   async requestHint(challengeId, currentCode = '', errorSummary = null, hintLevel = 1) {
+    if (this.isStaticHost()) return window.StaticEngine.requestHint(challengeId, hintLevel);
     const res = await fetch('/api/v1/hints', {
       method: 'POST',
       headers: this.getHeaders(),
@@ -229,6 +266,7 @@ const API = {
     if (!sid || sid === 'undefined') {
       throw new Error('Failed to load student progress');
     }
+    if (this.isStaticHost()) return window.StaticEngine.getStudentProgress(sid);
     const res = await fetch(`/api/v1/students/${encodeURIComponent(sid)}/progress`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load student progress');
     return await res.json();
@@ -238,12 +276,14 @@ const API = {
   // SITE OWNER & ADMIN API METHODS
   // ---------------------------------------------------------------------------
   async getAdminOverview() {
+    if (this.isStaticHost()) return window.StaticEngine.getAdminOverview();
     const res = await fetch('/api/v1/admin/overview', { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load admin overview. Requires Teacher or Owner role.');
     return await res.json();
   },
 
   async getAdminChallenges() {
+    if (this.isStaticHost()) return window.StaticEngine.getChallenges();
     const res = await fetch('/api/v1/admin/challenges', { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load challenges list.');
     return await res.json();
@@ -284,12 +324,14 @@ const API = {
   },
 
   async getAdminClasses() {
+    if (this.isStaticHost()) return window.StaticEngine.getAdminClasses();
     const res = await fetch('/api/v1/admin/classes', { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load classes.');
     return await res.json();
   },
 
   async updateStudentProfile(studentId, profile) {
+    if (this.isStaticHost()) return { status: 'updated' };
     const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -301,12 +343,17 @@ const API = {
   },
 
   async getAdminSettings() {
+    if (this.isStaticHost()) return window.StaticEngine.getSiteConfig();
     const res = await fetch('/api/v1/admin/settings', { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to load settings.');
     return await res.json();
   },
 
   async updateAdminSettings(settingsDict) {
+    if (this.isStaticHost()) {
+      localStorage.setItem('cm_static_settings', JSON.stringify(settingsDict));
+      return { status: 'updated', settings: settingsDict };
+    }
     const res = await fetch('/api/v1/admin/settings', {
       method: 'POST',
       headers: this.getHeaders(),
@@ -399,6 +446,9 @@ const API = {
   },
 
   async askCoach(missionId, code, question, language = 'python', recentError = null) {
+    if (this.isStaticHost()) {
+      return window.StaticEngine.askCoach(missionId, code, question, language, recentError);
+    }
     const res = await fetch('/api/v1/coach/ask', {
       method: 'POST',
       headers: this.getHeaders(),
@@ -416,16 +466,22 @@ const API = {
   },
 
   async getSkillProof() {
+    if (this.isStaticHost()) return window.StaticEngine.getSkillProof(this.getAccountId());
     const res = await fetch('/api/skillproof');
     return await res.json();
   },
 
   async getLearningReport() {
+    if (this.isStaticHost()) return { status: 'ok' };
     const res = await fetch('/api/learning-report');
     return await res.json();
   },
 
   async resetDemo() {
+    if (this.isStaticHost()) {
+      localStorage.removeItem('cm_prog_stu_alex_vance');
+      return { status: 'success' };
+    }
     const res = await fetch('/api/reset-demo', { method: 'POST' });
     return await res.json();
   }

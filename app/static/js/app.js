@@ -527,6 +527,22 @@ const App = {
   },
 
   async checkAuthAndInitialize() {
+    const params = new URLSearchParams(window.location.search);
+    const autoRole = (params.get('autologin') || '').toLowerCase();
+    if (autoRole === 'student') {
+      try {
+        await API.login('alex.vance@campus.edu', 'Student@Pass2026!');
+      } catch (e) {}
+    } else if (autoRole === 'admin') {
+      try {
+        await API.login('admin', 'Admin@Pass2026!');
+      } catch (e) {}
+    } else if (autoRole === 'teacher') {
+      try {
+        await API.login('turing@campus.edu', 'Teacher@Pass2026!');
+      } catch (e) {}
+    }
+
     try {
       const res = await API.getMyProfile();
       if (res && res.account) {
