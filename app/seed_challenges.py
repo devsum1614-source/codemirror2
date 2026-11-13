@@ -426,6 +426,27 @@ def seed_quest_data():
             ch.get("concept_recap"), ch.get("related_challenge_id")
         ))
 
+    # Seed sample verified SkillProof completions for default student accounts if empty
+    sample_completions = [
+        ("stu_alex_vance", "ch_py_first_steps", 25, "led_seed_alex_1"),
+        ("stu_maya_lin", "ch_py_first_steps", 25, "led_seed_maya_1"),
+        ("stu_maya_lin", "ch_web_validator", 50, "led_seed_maya_2")
+    ]
+    for stu_id, ch_id, xp_val, led_id in sample_completions:
+        cursor.execute(
+            "SELECT 1 FROM challenge_progress WHERE student_id = ? AND challenge_id = ?",
+            (stu_id, ch_id)
+        )
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT OR IGNORE INTO challenge_progress (student_id, challenge_id, xp_awarded) VALUES (?, ?, ?)",
+                (stu_id, ch_id, xp_val)
+            )
+            cursor.execute(
+                "INSERT OR IGNORE INTO xp_ledger (id, student_id, challenge_id, amount, reason) VALUES (?, ?, ?, ?, ?)",
+                (led_id, stu_id, ch_id, xp_val, f"First completion of {ch_id}")
+            )
+
     conn.commit()
     conn.close()
     print("Challenges seeded successfully with concept recaps.")

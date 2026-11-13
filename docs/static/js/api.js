@@ -12,31 +12,65 @@ const API = {
     );
   },
 
-  // Session & Authentication Storage
-  getToken() {
-    return localStorage.getItem('cm_session_token');
+  sanitizeAccount(account) {
+    if (!account || typeof account !== 'object') return null;
+    const rawRole = typeof account.role === 'string' ? account.role.trim().toLowerCase() : 'student';
+    const normalizedRole = (rawRole === 'owner' || rawRole === 'teacher' || rawRole === 'student')
+      ? rawRole
+      : 'student';
+    // Strictly whitelist non-sensitive public profile fields; never store passwords or secrets
+    return {
+      id: account.id,
+      display_name: account.display_name,
+      email: account.email,
+      role: normalizedRole,
+      class_id: account.class_id || null
+    };
   },
 
-  setSession(token, account) {
-    if (token) localStorage.setItem('cm_session_token', token);
-    if (account) {
-      localStorage.setItem('cm_user', JSON.stringify(account));
-      localStorage.setItem('quest_account_id', account.id);
-      localStorage.setItem('quest_student_id', account.id);
+  // Session & Authentication Storage (Opaque token & sanitized profile only; never passwords)
+  getToken() {
+    return sessionStorage.getItem('cm_session_token') || localStorage.getItem('cm_session_token');
+  },
+
+  setSession(token, account, rememberMe) {
+    const usePersistent = rememberMe === undefined
+      ? Boolean(localStorage.getItem('cm_session_token') && !sessionStorage.getItem('cm_session_token'))
+      : Boolean(rememberMe);
+    const targetStorage = usePersistent ? localStorage : sessionStorage;
+
+    // Clear both storages first so stale tokens or cached roles never collide
+    [sessionStorage, localStorage].forEach(store => {
+      store.removeItem('cm_session_token');
+      store.removeItem('cm_user');
+      store.removeItem('quest_account_id');
+      store.removeItem('quest_student_id');
+    });
+
+    if (token) {
+      targetStorage.setItem('cm_session_token', token);
+    }
+    const cleanAccount = this.sanitizeAccount(account);
+    if (cleanAccount) {
+      targetStorage.setItem('cm_user', JSON.stringify(cleanAccount));
+      targetStorage.setItem('quest_account_id', cleanAccount.id);
+      targetStorage.setItem('quest_student_id', cleanAccount.id);
     }
   },
 
   clearSession() {
-    localStorage.removeItem('cm_session_token');
-    localStorage.removeItem('cm_user');
-    localStorage.removeItem('quest_account_id');
-    localStorage.removeItem('quest_student_id');
+    [sessionStorage, localStorage].forEach(store => {
+      store.removeItem('cm_session_token');
+      store.removeItem('cm_user');
+      store.removeItem('quest_account_id');
+      store.removeItem('quest_student_id');
+    });
   },
 
   getStoredUser() {
     try {
-      const u = localStorage.getItem('cm_user');
-      return u ? JSON.parse(u) : null;
+      const raw = sessionStorage.getItem('cm_user') || localStorage.getItem('cm_user');
+      return raw ? this.sanitizeAccount(JSON.parse(raw)) : null;
     } catch (e) {
       return null;
     }
@@ -44,12 +78,14 @@ const API = {
 
   getAccountId() {
     const u = this.getStoredUser();
-    return (u && u.id) ? u.id : (localStorage.getItem('quest_account_id') || '');
+    return (u && u.id)
+      ? u.id
+      : (sessionStorage.getItem('quest_account_id') || localStorage.getItem('quest_account_id') || '');
   },
 
   setAccountId(id) {
-    localStorage.setItem('quest_account_id', id);
-    localStorage.setItem('quest_student_id', id);
+    sessionStorage.setItem('quest_account_id', id);
+    sessionStorage.setItem('quest_student_id', id);
   },
 
   getStudentId() {
@@ -72,34 +108,42 @@ const API = {
     return headers;
   },
 
-  // 1. Authentication Endpoints
-  async login(identifier, password) {
+  // 1. Same-Origin Authentication Endpoints (never stores passwords in browser storage)
+  async login(identifier, password, rememberMe = false) {
     if (this.isStaticHost()) {
       const data = window.StaticEngine.login(identifier, password);
-      this.setSession(data.token, data.account);
+      this.setSession(data.token, data.account, rememberMe);
       return data;
     }
     const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password })
+      body: JSON.stringify({
+        email: identifier,
+        identifier: identifier,
+        password: password,
+        remember_me: Boolean(rememberMe)
+      })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.detail || 'Invalid username or password.');
+      // Never reveal whether an account exists
+      throw new Error('Unable to sign in. Please check your email and password and try again.');
     }
-    this.setSession(data.token, data.account);
+    this.setSession(data.token, data.account, rememberMe);
     return data;
   },
 
   async registerStudent(displayName, email, password, classId = null) {
     if (this.isStaticHost()) {
       const data = window.StaticEngine.registerStudent(displayName, email, password, classId);
-      this.setSession(data.token, data.account);
+      this.setSession(data.token, data.account, false);
       return data;
     }
     const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         display_name: displayName,
@@ -110,9 +154,9 @@ const API = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.detail || 'Registration failed. Please check your inputs.');
+      throw new Error('Unable to complete registration. Please check your details and try again.');
     }
-    this.setSession(data.token, data.account);
+    this.setSession(data.token, data.account, false);
     return data;
   },
 
@@ -121,6 +165,7 @@ const API = {
       try {
         await fetch('/api/v1/auth/logout', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: this.getHeaders()
         });
       } catch (e) {
@@ -140,7 +185,11 @@ const API = {
       if (!u) throw new Error('Unauthorized or session expired');
       return { account: u };
     }
-    const res = await fetch('/api/v1/auth/me', { headers: this.getHeaders() });
+    const res = await fetch('/api/v1/auth/me', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: this.getHeaders()
+    });
     if (!res.ok) {
       this.clearSession();
       throw new Error('Unauthorized or session expired');
@@ -199,6 +248,44 @@ const API = {
     const res = await fetch(`/api/v1/languages/${langId}`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error(`Failed to load details for ${langId}`);
     return await res.json();
+  },
+
+  async getExamples() {
+    if (this.isStaticHost() && window.StaticEngine.getExamples) {
+      return window.StaticEngine.getExamples();
+    }
+    const res = await fetch('/api/v1/examples', { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to load code examples library');
+    return await res.json();
+  },
+
+  async getLanguageExamples(langId) {
+    if (this.isStaticHost() && window.StaticEngine.getLanguageExamples) {
+      return window.StaticEngine.getLanguageExamples(langId);
+    }
+    const res = await fetch(`/api/v1/examples/${encodeURIComponent(langId)}`, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error(`Failed to load examples for ${langId}`);
+    return await res.json();
+  },
+
+  async runCode(code, language = 'python', stdin = '') {
+    if (this.isStaticHost() && window.StaticEngine.runCode) {
+      return window.StaticEngine.runCode(code, language, stdin);
+    }
+    const res = await fetch('/api/v1/run', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        code: code,
+        language: language,
+        stdin: stdin || ''
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || 'Code execution failed.');
+    }
+    return data;
   },
 
   // 3. Mission catalog (tests are private to server)
@@ -330,8 +417,34 @@ const API = {
     return await res.json();
   },
 
+  async getAdminStudents(query = '') {
+    if (this.isStaticHost() && window.StaticEngine.getAdminStudents) {
+      return window.StaticEngine.getAdminStudents(query);
+    }
+    const url = query
+      ? `/api/v1/admin/students?q=${encodeURIComponent(query)}`
+      : '/api/v1/admin/students';
+    const res = await fetch(url, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to load students.');
+    return await res.json();
+  },
+
+  async getAdminStudentProfile(studentId) {
+    if (this.isStaticHost() && window.StaticEngine.getAdminStudentProfile) {
+      return window.StaticEngine.getAdminStudentProfile(studentId);
+    }
+    const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}/profile`, {
+      headers: this.getHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Failed to load student profile.');
+    return data;
+  },
+
   async updateStudentProfile(studentId, profile) {
-    if (this.isStaticHost()) return { status: 'updated' };
+    if (this.isStaticHost() && window.StaticEngine && window.StaticEngine.updateStudentProfile) {
+      return window.StaticEngine.updateStudentProfile(studentId, profile);
+    }
     const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -339,6 +452,61 @@ const API = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || 'Could not update student profile.');
+    return data;
+  },
+
+  async assignStudentProgram(studentId, languageId) {
+    if (this.isStaticHost() && window.StaticEngine && window.StaticEngine.assignStudentProgram) {
+      return window.StaticEngine.assignStudentProgram(studentId, languageId);
+    }
+    const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}/programs`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ language_id: languageId })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Could not assign learning program.');
+    return data;
+  },
+
+  async removeStudentProgram(studentId, languageId) {
+    if (this.isStaticHost() && window.StaticEngine && window.StaticEngine.removeStudentProgram) {
+      return window.StaticEngine.removeStudentProgram(studentId, languageId);
+    }
+    const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}/programs/${encodeURIComponent(languageId)}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Could not remove learning program.');
+    return data;
+  },
+
+  async setStudentPrograms(studentId, languageIds) {
+    if (this.isStaticHost() && window.StaticEngine && window.StaticEngine.setStudentPrograms) {
+      return window.StaticEngine.setStudentPrograms(studentId, languageIds);
+    }
+    const res = await fetch(`/api/v1/admin/students/${encodeURIComponent(studentId)}/programs`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ language_ids: languageIds })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Could not update learning programs.');
+    return data;
+  },
+
+  async getStudentPrograms(studentId = null) {
+    const sid = studentId || this.getAccountId();
+    if (!sid) throw new Error('Student ID required');
+    if (this.isStaticHost() && window.StaticEngine && window.StaticEngine.getStudentPrograms) {
+      return window.StaticEngine.getStudentPrograms(sid);
+    }
+    const res = await fetch(`/api/v1/students/${encodeURIComponent(sid)}/programs`, {
+      headers: this.getHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Could not load assigned programs.');
     return data;
   },
 

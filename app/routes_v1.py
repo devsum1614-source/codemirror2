@@ -16,10 +16,15 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import get_optional_account
-from app.sandbox import execute_in_sandbox
+from app.sandbox import execute_in_sandbox, execute_code_snippet
 from app.ai_coach import get_staged_hint, socratic_coach_response, MISSION_MAPPING, is_ai_configured
 from app.runtimes import get_available_runtimes, check_language_runtime
-from app.languages import get_all_languages_summary, get_language_details
+from app.languages import (
+    get_all_languages_summary,
+    get_language_details,
+    get_all_examples_catalog,
+    get_student_assigned_programs,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -28,6 +33,11 @@ class AttemptRequest(BaseModel):
     challenge_id: str = Field(..., description="ID of the coding challenge")
     code: str = Field(..., description="Student's submitted source code")
     language: Optional[str] = Field("python", description="Programming language of the submission")
+
+class RunCodeRequest(BaseModel):
+    code: str = Field(..., description="Standalone code or example to run")
+    language: Optional[str] = Field("python", description="Programming language to execute")
+    stdin: Optional[str] = Field("", description="Optional standard input")
 
 class HintRequest(BaseModel):
     challenge_id: str = Field(..., description="ID of the coding challenge")
@@ -154,6 +164,42 @@ def get_language(lang_id: str):
     if not data:
         raise HTTPException(status_code=404, detail=f"Language '{lang_id}' not found in catalog.")
     return data
+
+
+@router.get("/examples")
+def list_code_examples():
+    """Returns built-in beginner Code Examples library for all 7 catalog languages with runtime status."""
+    languages = get_all_examples_catalog()
+    return {
+        "total_languages": len(languages),
+        "total_examples": sum(len(lang.get("examples", [])) for lang in languages),
+        "languages": languages,
+    }
+
+
+@router.get("/examples/{lang_id}")
+def get_language_examples(lang_id: str):
+    """Returns built-in beginner Code Examples for a specific language with runtime status."""
+    catalog = {item["id"]: item for item in get_all_examples_catalog()}
+    norm = (lang_id or "").lower().strip()
+    if norm not in catalog:
+        raise HTTPException(status_code=404, detail=f"Language '{lang_id}' not found in examples library.")
+    return catalog[norm]
+
+
+@router.post("/run")
+def run_standalone_code(req: RunCodeRequest):
+    """
+    Runs a code example or standalone student program in an isolated, time-limited environment
+    using the language's compiler, interpreter, or runtime.
+    Never claims challenge test passes; reports View only if the toolchain is not installed.
+    """
+    return execute_code_snippet(
+        code=req.code,
+        language=req.language or "python",
+        stdin_text=req.stdin or "",
+        timeout_seconds=3.0,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -446,6 +492,18 @@ def get_student_progress(student_id: str, request: Request):
         conn.close()
         raise HTTPException(status_code=404, detail="Student profile not found.")
 
+    # Look up account & enrolled class details for this student only
+    cursor.execute("""
+        SELECT acc.email, acc.class_id, cls.name as class_name
+        FROM accounts acc
+        LEFT JOIN classes cls ON acc.class_id = cls.id
+        WHERE acc.id = ?
+    """, (student_id,))
+    acc_row = cursor.fetchone()
+    student_email = acc_row["email"] if acc_row else None
+    student_class_id = acc_row["class_id"] if acc_row else None
+    student_class_name = (acc_row["class_name"] if acc_row and acc_row["class_name"] else student_class_id) or "Unassigned"
+
     # Calculate total XP directly from auditable ledger
     cursor.execute("SELECT COALESCE(SUM(amount), 0) as total_xp FROM xp_ledger WHERE student_id = ?", (student_id,))
     total_xp = cursor.fetchone()["total_xp"]
@@ -455,7 +513,7 @@ def get_student_progress(student_id: str, request: Request):
 
     # Completed challenges
     cursor.execute("""
-        SELECT cp.challenge_id, cp.completed_at, cp.xp_awarded, c.title, c.skill_tag
+        SELECT cp.challenge_id, cp.completed_at, cp.xp_awarded, c.title, c.skill_tag, c.execution_language, c.difficulty
         FROM challenge_progress cp
         JOIN challenges c ON cp.challenge_id = c.id
         WHERE cp.student_id = ?
@@ -477,19 +535,52 @@ def get_student_progress(student_id: str, request: Request):
     cursor.execute("SELECT COUNT(*) as hints_requested FROM hint_events WHERE student_id = ?", (student_id,))
     hint_count = cursor.fetchone()["hints_requested"]
 
+    # Student's own assigned learning programs with status & progress
+    assigned_programs = get_student_assigned_programs(conn, student_id)
+
     conn.close()
 
     return {
         "student_id": student["id"],
         "display_name": student["display_name"],
+        "email": student_email,
+        "class_id": student_class_id,
+        "class_name": student_class_name,
         "total_xp": total_xp,
         "level": level,
         "xp_per_level": xp_per_level,
         "completed_count": len(completed),
         "completed_challenges": completed,
+        "assigned_programs": assigned_programs,
         "total_attempts": attempt_stats["total_attempts"] or 0,
         "passed_attempts": attempt_stats["passed_attempts"] or 0,
         "hints_requested": hint_count
+    }
+
+
+@router.get("/students/{student_id}/programs")
+def get_student_programs_endpoint(student_id: str, request: Request):
+    """Returns a student's own assigned learning programs. Students cannot view other students' programs."""
+    acc = get_optional_account(request)
+    if not acc:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    if acc.get("role") == "student" and acc["id"] != student_id:
+        raise HTTPException(status_code=403, detail="Access denied. Students can only view their own assigned programs.")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, display_name FROM students WHERE id = ?", (student_id,))
+    student = cursor.fetchone()
+    if not student:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Student profile not found.")
+
+    assigned_programs = get_student_assigned_programs(conn, student_id)
+    conn.close()
+    return {
+        "student_id": student["id"],
+        "display_name": student["display_name"],
+        "assigned_programs": assigned_programs
     }
 
 

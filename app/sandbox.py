@@ -1,20 +1,67 @@
 """
 Isolated Sandbox Execution Engine for Student Coding Quest & CodeMirror 2.0
-Runs student code against private test suites in a disposable subprocess worker.
-Enforces execution timeouts, restricted environment, and sanitized error summaries.
+Runs student code against private test suites or standalone examples in a disposable subprocess worker.
+Enforces execution timeouts, restricted environment, and plain-language error summaries.
 Guarantees we never display fake success when a language runtime is absent.
 """
 
 import sys
 import os
+import re
 import json
+import sqlite3
 import tempfile
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from app.runtimes import check_language_runtime
 
-# Python / SQL worker template
+# Default sample SQL schema pre-loaded for standalone SQL examples and queries
+DEFAULT_SQL_EXAMPLE_SCHEMA = """
+CREATE TABLE categories (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE resources (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    category_id INTEGER,
+    status TEXT NOT NULL,
+    created_at TEXT,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+);
+
+INSERT INTO categories (id, name) VALUES
+(1, 'STEM & Robotics'),
+(2, 'Arts & Media'),
+(3, 'Career Services');
+
+INSERT INTO resources (id, title, category_id, status, created_at) VALUES
+(101, '3D Printer Lab Access', 1, 'active', '2026-10-01 10:00:00'),
+(102, 'Old Newsletter Archive', 2, 'archived', '2026-09-01 12:00:00'),
+(103, 'Resume Review Session', 3, 'active', '2026-10-15 14:00:00'),
+(104, 'VR Development Kit', 1, 'active', '2026-10-20 09:30:00');
+"""
+
+# Python standalone snippet runner template (blocks network access)
+STANDALONE_PYTHON_RUNNER = r"""
+import sys
+
+def _block_network():
+    for mod in ['socket', 'urllib', 'http', 'requests']:
+        sys.modules[mod] = None
+
+_block_network()
+
+with open("main.py", "r", encoding="utf-8") as _f:
+    _code = _f.read()
+
+_globals = {"__name__": "__main__"}
+exec(compile(_code, "main.py", "exec"), _globals)
+"""
+
+# Python / SQL challenge test worker template
 WORKER_TEMPLATE_PYTHON = r"""
 import sys
 import json
@@ -169,6 +216,336 @@ def run():
 if __name__ == "__main__":
     run()
 """
+
+
+def _format_sql_table(columns: List[str], rows: List[Any]) -> str:
+    if not columns:
+        return ""
+    str_rows = [[str(cell) if cell is not None else "NULL" for cell in row] for row in rows]
+    widths = [len(col) for col in columns]
+    for r in str_rows:
+        for idx, val in enumerate(r):
+            if idx < len(widths):
+                widths[idx] = max(widths[idx], len(val))
+    header = " | ".join(col.ljust(widths[i]) for i, col in enumerate(columns))
+    sep = "-+-".join("-" * widths[i] for i in range(len(columns)))
+    body = [" | ".join(r[i].ljust(widths[i]) for i in range(len(columns))) for r in str_rows]
+    return "\n".join([header, sep] + body)
+
+
+def _split_sql_statements(sql_text: str) -> List[str]:
+    """Splits SQL script into individual statements using sqlite3.complete_statement."""
+    statements: List[str] = []
+    buffer: List[str] = []
+    for line in sql_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--") and not buffer:
+            continue
+        buffer.append(line)
+        candidate = "\n".join(buffer)
+        if sqlite3.complete_statement(candidate):
+            stmt = candidate.strip()
+            if stmt:
+                statements.append(stmt)
+            buffer = []
+    remainder = "\n".join(buffer).strip()
+    if remainder:
+        statements.append(remainder)
+    return statements
+
+
+def execute_code_snippet(
+    code: str,
+    language: str = "python",
+    stdin_text: str = "",
+    timeout_seconds: float = 3.0,
+) -> Dict[str, Any]:
+    """
+    Runs a standalone code example or student program in an isolated, time-limited environment
+    using the language's actual compiler, interpreter, or runtime.
+    Never claims fake execution when a toolchain is not installed.
+    """
+    lang_info = check_language_runtime(language)
+    lang_id = lang_info.get("id", (language or "python").lower())
+
+    if not lang_info["available"]:
+        return {
+            "language": lang_id,
+            "language_name": lang_info["name"],
+            "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+            "runtime_available": False,
+            "status_label": "Not installed",
+            "mode_label": "View only",
+            "ran": False,
+            "success": False,
+            "output": "",
+            "error": (
+                f"{lang_info['name']} ({lang_info.get('runtime_label', 'compiler/runtime')}) is not installed on this server. "
+                "This example is View only and was not executed."
+            ),
+            "setup_guide": lang_info.get("setup_guide", {}),
+        }
+
+    # 1. HTML & CSS Browser Preview
+    if lang_id == "html":
+        has_markup = len((code or "").strip()) > 0
+        return {
+            "language": "html",
+            "language_name": lang_info["name"],
+            "runtime_label": lang_info.get("runtime_label", "Browser preview"),
+            "runtime_available": True,
+            "status_label": "Available",
+            "mode_label": "Runnable",
+            "ran": True,
+            "success": has_markup,
+            "output": "Rendered in the live browser preview.",
+            "error": None if has_markup else "Enter HTML or CSS code to preview it.",
+            "html_preview": code,
+        }
+
+    # 2. SQL (In-memory SQLite engine)
+    if lang_id == "sql":
+        conn = sqlite3.connect(":memory:")
+        try:
+            cur = conn.cursor()
+            cur.executescript(DEFAULT_SQL_EXAMPLE_SCHEMA)
+            statements = _split_sql_statements(code or "")
+            if not statements:
+                return {
+                    "language": "sql",
+                    "language_name": lang_info["name"],
+                    "runtime_label": lang_info.get("runtime_label", "SQLite engine"),
+                    "runtime_available": True,
+                    "status_label": "Available",
+                    "mode_label": "Runnable",
+                    "ran": True,
+                    "success": False,
+                    "output": "",
+                    "error": "No SQL statement found to execute.",
+                }
+
+            outputs: List[str] = []
+            for stmt in statements:
+                cur.execute(stmt)
+                if cur.description:
+                    cols = [d[0] for d in cur.description]
+                    rows = cur.fetchall()
+                    outputs.append(_format_sql_table(cols, rows))
+
+            conn.commit()
+            final_output = "\n\n".join(outputs) if outputs else "SQL statement executed."
+            return {
+                "language": "sql",
+                "language_name": lang_info["name"],
+                "runtime_label": lang_info.get("runtime_label", "SQLite engine"),
+                "runtime_available": True,
+                "status_label": "Available",
+                "mode_label": "Runnable",
+                "ran": True,
+                "success": True,
+                "output": final_output,
+                "error": None,
+            }
+        except Exception as sql_err:
+            return {
+                "language": "sql",
+                "language_name": lang_info["name"],
+                "runtime_label": lang_info.get("runtime_label", "SQLite engine"),
+                "runtime_available": True,
+                "status_label": "Available",
+                "mode_label": "Runnable",
+                "ran": True,
+                "success": False,
+                "output": "",
+                "error": f"SQL error: {sql_err}",
+            }
+        finally:
+            conn.close()
+
+    # 3. Subprocess-based compilers and interpreters (Python, JavaScript, Java, C, C++)
+    clean_env = {
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", "C:\\Windows"),
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": "",
+        "PYTHONIOENCODING": "utf-8",
+    }
+
+    with tempfile.TemporaryDirectory(prefix=f"cw_run_{lang_id}_") as temp_dir:
+        try:
+            if lang_id == "python":
+                code_path = os.path.join(temp_dir, "main.py")
+                runner_path = os.path.join(temp_dir, "_runner.py")
+                with open(code_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                with open(runner_path, "w", encoding="utf-8") as f:
+                    f.write(STANDALONE_PYTHON_RUNNER)
+                run_cmd = [sys.executable, runner_path]
+
+            elif lang_id == "javascript":
+                code_path = os.path.join(temp_dir, "main.js")
+                with open(code_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                run_cmd = [lang_info["executable"], code_path]
+
+            elif lang_id == "java":
+                match = re.search(r"public\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", code) or re.search(
+                    r"class\s+([A-Za-z_][A-Za-z0-9_]*)", code
+                )
+                class_name = match.group(1) if match else "Main"
+                java_file = os.path.join(temp_dir, f"{class_name}.java")
+                with open(java_file, "w", encoding="utf-8") as f:
+                    f.write(code)
+
+                compile_proc = subprocess.run(
+                    [lang_info["executable"], java_file],
+                    cwd=temp_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_seconds,
+                    env=clean_env,
+                )
+                if compile_proc.returncode != 0:
+                    err_text = (compile_proc.stderr or compile_proc.stdout or "Java compilation failed.").replace(
+                        temp_dir, ""
+                    ).strip()
+                    return {
+                        "language": "java",
+                        "language_name": lang_info["name"],
+                        "runtime_label": lang_info.get("runtime_label", "Java compiler and JVM"),
+                        "runtime_available": True,
+                        "status_label": "Available",
+                        "mode_label": "Runnable",
+                        "ran": True,
+                        "success": False,
+                        "output": "",
+                        "error": f"Compiler error:\n{err_text}",
+                    }
+                java_bin = lang_info.get("java_executable") or "java"
+                run_cmd = [java_bin, "-cp", temp_dir, class_name]
+
+            elif lang_id in ("c", "cpp"):
+                src_name = "main.c" if lang_id == "c" else "main.cpp"
+                exe_name = "program.exe" if os.name == "nt" else "program"
+                src_path = os.path.join(temp_dir, src_name)
+                exe_path = os.path.join(temp_dir, exe_name)
+                with open(src_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+
+                compile_args = [lang_info["executable"], src_path, "-o", exe_path]
+                if lang_id == "cpp":
+                    compile_args = [lang_info["executable"], "-std=c++17", src_path, "-o", exe_path]
+
+                compile_proc = subprocess.run(
+                    compile_args,
+                    cwd=temp_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_seconds,
+                    env=clean_env,
+                )
+                if compile_proc.returncode != 0:
+                    err_text = (compile_proc.stderr or compile_proc.stdout or "Compilation failed.").replace(
+                        temp_dir, ""
+                    ).strip()
+                    return {
+                        "language": lang_id,
+                        "language_name": lang_info["name"],
+                        "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                        "runtime_available": True,
+                        "status_label": "Available",
+                        "mode_label": "Runnable",
+                        "ran": True,
+                        "success": False,
+                        "output": "",
+                        "error": f"Compiler error:\n{err_text}",
+                    }
+                run_cmd = [exe_path]
+            else:
+                return {
+                    "language": lang_id,
+                    "language_name": lang_info["name"],
+                    "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                    "runtime_available": False,
+                    "status_label": "Not installed",
+                    "mode_label": "View only",
+                    "ran": False,
+                    "success": False,
+                    "output": "",
+                    "error": f"Unsupported language runtime: {language}",
+                }
+
+            proc = subprocess.run(
+                run_cmd,
+                cwd=temp_dir,
+                input=stdin_text or "",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout_seconds,
+                env=clean_env,
+            )
+            stdout_clean = (proc.stdout or "").replace(temp_dir, "<workspace>").rstrip()
+            stderr_clean = (proc.stderr or "").replace(temp_dir, "<workspace>").strip()
+
+            if proc.returncode != 0:
+                # Extract concise, readable error line for beginners
+                err_lines = [line for line in stderr_clean.splitlines() if "_runner.py" not in line]
+                friendly_err = "\n".join(err_lines[-6:]) if err_lines else "Program exited with an error."
+                return {
+                    "language": lang_id,
+                    "language_name": lang_info["name"],
+                    "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                    "runtime_available": True,
+                    "status_label": "Available",
+                    "mode_label": "Runnable",
+                    "ran": True,
+                    "success": False,
+                    "output": stdout_clean,
+                    "error": friendly_err,
+                }
+
+            return {
+                "language": lang_id,
+                "language_name": lang_info["name"],
+                "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                "runtime_available": True,
+                "status_label": "Available",
+                "mode_label": "Runnable",
+                "ran": True,
+                "success": True,
+                "output": stdout_clean,
+                "error": None,
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "language": lang_id,
+                "language_name": lang_info["name"],
+                "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                "runtime_available": True,
+                "status_label": "Available",
+                "mode_label": "Runnable",
+                "ran": True,
+                "success": False,
+                "output": "",
+                "error": f"Time limit exceeded ({timeout_seconds}s). Check your code for an infinite loop.",
+            }
+        except Exception as exc:
+            return {
+                "language": lang_id,
+                "language_name": lang_info["name"],
+                "runtime_label": lang_info.get("runtime_label", lang_info["name"]),
+                "runtime_available": True,
+                "status_label": "Available",
+                "mode_label": "Runnable",
+                "ran": True,
+                "success": False,
+                "output": "",
+                "error": f"Execution error: {exc}",
+            }
+
 
 def execute_in_sandbox(
     challenge_id: str, 

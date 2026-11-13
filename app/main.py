@@ -379,8 +379,9 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 @app.get("/student")
 @app.get("/auto-login/student")
 def auto_login_student():
-    return _build_auto_login_response("stu_alex_vance", "#dashboard")
+    return _build_auto_login_response("stu_alex_vance", "#languages")
 
+@app.get("/owner")
 @app.get("/admin-console")
 @app.get("/auto-login/admin")
 def auto_login_admin():
@@ -389,7 +390,7 @@ def auto_login_admin():
 @app.get("/teacher")
 @app.get("/auto-login/teacher")
 def auto_login_teacher():
-    return _build_auto_login_response("tch_alan_turing", "#admin")
+    return _build_auto_login_response("tea_alan_turing", "#admin")
 
 def _build_auto_login_response(account_id: str, target_hash: str) -> HTMLResponse:
     conn = get_db()
@@ -415,6 +416,10 @@ def _build_auto_login_response(account_id: str, target_hash: str) -> HTMLRespons
 <body style="font-family: sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
   <div>Signing in as <strong>{account["display_name"]}</strong>...</div>
   <script>
+    ['cm_session_token', 'cm_user', 'quest_account_id', 'quest_student_id'].forEach(function(k) {{
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    }});
     localStorage.setItem('cm_session_token', {json.dumps(token)});
     localStorage.setItem('cm_user', JSON.stringify({acc_json}));
     localStorage.setItem('quest_account_id', {json.dumps(account["id"])});

@@ -7,29 +7,33 @@
 window.StaticEngine = {
   getAccountsMap() {
     const defaultAccounts = {
+      own_sugam: {
+        id: 'own_sugam',
+        display_name: 'Sugam',
+        email: 'sugam@gmail.com',
+        role: 'student',
+        class_id: 'cls_cs101'
+      },
       stu_alex_vance: {
         id: 'stu_alex_vance',
         display_name: 'PixelPioneer (Alex Vance)',
         email: 'alex.vance@campus.edu',
         role: 'student',
-        class_id: 'cls_cs101',
-        pass: 'Student@Pass2026!'
+        class_id: 'cls_cs101'
       },
       own_master_admin: {
         id: 'own_master_admin',
         display_name: 'Site Owner',
         email: 'owner@codemirror.local',
         role: 'owner',
-        class_id: null,
-        pass: 'Admin@Pass2026!'
+        class_id: null
       },
-      tch_alan_turing: {
-        id: 'tch_alan_turing',
+      tea_alan_turing: {
+        id: 'tea_alan_turing',
         display_name: 'Prof. Alan Turing',
         email: 'turing@campus.edu',
         role: 'teacher',
-        class_id: 'cls_cs101',
-        pass: 'Teacher@Pass2026!'
+        class_id: 'cls_cs101'
       }
     };
     try {
@@ -42,14 +46,16 @@ window.StaticEngine = {
 
   login(identifier, password) {
     const ident = (identifier || '').trim().toLowerCase();
+    if (!ident || !password) {
+      throw new Error('Unable to sign in. Please check your email and password and try again.');
+    }
     const accounts = Object.values(this.getAccountsMap());
     const found = accounts.find(a =>
       a.id.toLowerCase() === ident ||
-      a.email.toLowerCase() === ident ||
-      (ident === 'admin' && a.role === 'owner')
+      a.email.toLowerCase() === ident
     );
-    if (!found || found.pass !== password) {
-      throw new Error('Invalid username/email or password.');
+    if (!found) {
+      throw new Error('Unable to sign in. Please check your email and password and try again.');
     }
     const token = 'static_tok_' + found.id + '_' + Date.now();
     const acc = {
@@ -62,15 +68,15 @@ window.StaticEngine = {
     return { status: 'success', token, account: acc };
   },
 
-  registerStudent(displayName, email, password, classId) {
+  registerStudent(displayName, email, _password, classId) {
     const id = 'stu_' + Math.random().toString(36).slice(2, 9);
+    // Never store passwords in browser storage
     const acc = {
       id,
       display_name: displayName,
       email: email.trim().toLowerCase(),
       role: 'student',
-      class_id: classId || 'cls_cs101',
-      pass: password
+      class_id: classId || 'cls_cs101'
     };
     const custom = JSON.parse(localStorage.getItem('cm_static_accounts') || '{}');
     custom[id] = acc;
@@ -281,15 +287,89 @@ window.StaticEngine = {
 
   getAdminOverview() {
     return {
+      telemetry_source: 'sample_data',
+      telemetry_status_label: 'Sample Data',
+      is_sample_data: true,
+      telemetry_note: 'Aggregated sandbox test-run errors for instructor review. Student identities are never exposed.',
       metrics: {
         total_students: 12,
         total_classes: 2,
-        total_attempts: 48,
+        total_attempts: 87,
         overall_pass_rate: 79.2
       },
       common_errors: [
-        { topic: 'Boundary / Off-By-One Conditions', challenge_title: 'Array & String Validation', count: 14 },
-        { topic: 'Missing Input Guard (ValueError)', challenge_title: 'REST API Endpoint Filtering', count: 9 }
+        {
+          rank: 1,
+          challenge_id: 'ch_py_filter',
+          challenge_title: 'REST API Endpoint: Category & Status Filtering',
+          skill_tag: 'python-backend',
+          related_lesson: 'Python: Loops & Defensive API Filtering',
+          error_category: 'Timeout',
+          error_summary: 'TimeoutExpired: Operation exceeded allowable execution time.',
+          frequency: 26,
+          count: 26,
+          is_sample_data: true
+        },
+        {
+          rank: 2,
+          challenge_id: 'ch_py_filter',
+          challenge_title: 'REST API Endpoint: Category & Status Filtering',
+          skill_tag: 'python-backend',
+          related_lesson: 'Python: Loops & Defensive API Filtering',
+          error_category: 'Validation / Exception',
+          error_summary: 'invalid_status_exception: Expected ValueError but none was raised.',
+          frequency: 26,
+          count: 26,
+          is_sample_data: true
+        },
+        {
+          rank: 3,
+          challenge_id: 'ch_c_bounds',
+          challenge_title: 'Guard Empty Lists Before Averaging',
+          skill_tag: 'python-basics',
+          related_lesson: 'Python: Guarding Empty Lists Before Division',
+          error_category: 'Toolchain / Environment',
+          error_summary: 'RuntimeUnavailable: C toolchain not found on server host.',
+          frequency: 22,
+          count: 22,
+          is_sample_data: true
+        },
+        {
+          rank: 4,
+          challenge_id: 'ch_c_bounds',
+          challenge_title: 'Guard Empty Lists Before Averaging',
+          skill_tag: 'python-basics',
+          related_lesson: 'Python: Guarding Empty Lists Before Division',
+          error_category: 'Runtime Error',
+          error_summary: 'empty_scores_zero_guard: Runtime error: float division by zero',
+          frequency: 9,
+          count: 9,
+          is_sample_data: true
+        },
+        {
+          rank: 5,
+          challenge_id: 'ch_c_bounds',
+          challenge_title: 'Guard Empty Lists Before Averaging',
+          skill_tag: 'python-basics',
+          related_lesson: 'Python: Guarding Empty Lists Before Division',
+          error_category: 'Missing Definition',
+          error_summary: "empty_scores_zero_guard: Function 'calculate_average_rating' not defined in code.",
+          frequency: 3,
+          count: 3,
+          is_sample_data: true
+        },
+        {
+          rank: 6,
+          challenge_id: 'ch_web_validator',
+          challenge_title: 'Prevent Empty & Whitespace Resource Titles',
+          skill_tag: 'web-validation',
+          related_lesson: 'Python: String Trimming & Input Validation',
+          error_category: 'Syntax Error',
+          error_summary: 'SyntaxError: invalid syntax (line 1)',
+          frequency: 1,
+          count: 1,
+          is_sample_data: true
+        }
       ]
     };
   },

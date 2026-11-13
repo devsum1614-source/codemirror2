@@ -60,6 +60,16 @@ def init_db():
         FOREIGN KEY (teacher_id) REFERENCES accounts(id)
     );
 
+    CREATE TABLE IF NOT EXISTS student_programs (
+        student_id TEXT NOT NULL,
+        language_id TEXT NOT NULL,
+        assigned_by TEXT,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, language_id),
+        FOREIGN KEY (student_id) REFERENCES accounts(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_student_programs_student ON student_programs(student_id);
+
     CREATE TABLE IF NOT EXISTS site_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -268,6 +278,7 @@ def init_db():
 
     # Seed default accounts (Owner, Teacher, Students) with real passwords
     default_accounts = [
+        ("own_sugam", "Sugam", "sugam@gmail.com", "student", _default_hash("Sugam@2026!"), "cls_cs101"),
         ("own_master_admin", "Site Owner (Admin)", "owner@codemirror.local", "owner", _default_hash("Admin@Pass2026!"), None),
         ("tea_alan_turing", "Prof. Alan Turing", "turing@campus.edu", "teacher", _default_hash("Teacher@Pass2026!"), "cls_cs101"),
         ("stu_alex_vance", "PixelPioneer (Alex)", "alex.vance@campus.edu", "student", _default_hash("Student@Pass2026!"), "cls_cs101"),
@@ -285,6 +296,25 @@ def init_db():
                 password_hash=COALESCE(accounts.password_hash, excluded.password_hash),
                 class_id=excluded.class_id
         """, acc)
+
+    # Keep active session roles synchronized with authoritative account roles
+    cursor.execute("""
+        UPDATE sessions
+        SET role = (SELECT accounts.role FROM accounts WHERE accounts.id = sessions.account_id)
+        WHERE account_id IN (SELECT id FROM accounts)
+    """)
+
+    for stu_row in [
+        ("own_sugam", "Sugam"),
+        ("stu_alex_vance", "PixelPioneer (Alex)"),
+        ("stu_maya_lin", "ByteVoyager (Maya)"),
+        ("stu_kai_chen", "NovaCoder (Kai)")
+    ]:
+        cursor.execute("""
+            INSERT INTO students (id, display_name)
+            VALUES (?, ?)
+            ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
+        """, stu_row)
 
     # Ensure any existing accounts with NULL password_hash get a working default password
     cursor.execute("UPDATE accounts SET password_hash = ? WHERE password_hash IS NULL AND role = 'owner'", (_default_hash("Admin@Pass2026!"),))
@@ -305,6 +335,27 @@ def init_db():
                 teacher_id=excluded.teacher_id,
                 description=excluded.description
         """, cls)
+
+    # Seed default student learning programs if none exist yet
+    cursor.execute("SELECT COUNT(*) as cnt FROM student_programs")
+    if (cursor.fetchone()["cnt"] or 0) == 0:
+        default_student_programs = [
+            ("stu_alex_vance", "python", "tea_alan_turing"),
+            ("stu_alex_vance", "sql", "tea_alan_turing"),
+            ("stu_alex_vance", "html", "tea_alan_turing"),
+            ("stu_maya_lin", "python", "tea_alan_turing"),
+            ("stu_maya_lin", "sql", "tea_alan_turing"),
+            ("stu_kai_chen", "html", "tea_alan_turing"),
+            ("stu_kai_chen", "javascript", "tea_alan_turing"),
+            ("own_sugam", "python", "tea_alan_turing"),
+            ("own_sugam", "sql", "tea_alan_turing"),
+            ("own_sugam", "html", "tea_alan_turing"),
+        ]
+        for sp in default_student_programs:
+            cursor.execute("""
+                INSERT OR IGNORE INTO student_programs (student_id, language_id, assigned_by)
+                VALUES (?, ?, ?)
+            """, sp)
 
     # Seed default site settings
     default_settings = [
