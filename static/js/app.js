@@ -1,5 +1,5 @@
 /**
- * CodeMirror 2.0 - Beginner Coding Tutor & Learning Workspace
+ * Code Wizard - Online Compilers & Beginner Coding Platform
  * Implements:
  * - Language Home Page (Searchable catalog of actually supported languages)
  * - Dedicated Language Pages (/languages/{id}) with lessons, labs, examples, and setup
