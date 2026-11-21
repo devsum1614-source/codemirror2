@@ -1,5 +1,5 @@
 """
-Runner for CodeMirror 2.0 Web Application
+Runner for Code Wizard Web Application
 """
 import uvicorn
 import os
@@ -20,7 +20,7 @@ if current_dir not in sys.path:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     print("=" * 65)
-    print("[*] CodeMirror 2.0 - AI-Powered Skill Development Platform")
+    print("[*] Code Wizard - Online Compilers & Coding Tutorials")
     print(f"    Local:   http://127.0.0.1:{port}")
     print(f"    Network: http://0.0.0.0:{port} (accessible from other devices)")
     print("=" * 65)

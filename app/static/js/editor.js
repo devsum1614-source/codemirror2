@@ -1,5 +1,5 @@
 /**
- * Monaco Editor Controller for CodeMirror 2.0
+ * Monaco Editor Controller for Code Wizard
  */
 class EditorManager {
   constructor() {

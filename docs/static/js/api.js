@@ -1,5 +1,5 @@
 /**
- * Student Coding Quest & CodeMirror 2.0 API Client
+ * Code Wizard API Client
  * Communicates exclusively through secure versioned REST endpoints.
  * Never connects directly to the database. Supports Student, Teacher, and Owner roles.
  */

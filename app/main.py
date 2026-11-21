@@ -361,7 +361,7 @@ def get_learning_report():
     conn.close()
     return {
         "student": user,
-        "institution": "CodeMirror 2.0 Engineering Lab",
+        "institution": "Code Wizard Engineering Lab",
         "completed_tasks": completed,
         "evidence": evidence,
         "generated_at": "November 2026",
