@@ -48,7 +48,10 @@ const App = {
     adminErrorChallengeFilter: 'all',
     adminErrorCategoryFilter: 'all',
     adminErrorIsSampleData: false,
-    adminErrorStatusLabel: 'Aggregated Sandbox Data'
+    adminErrorStatusLabel: 'Aggregated Sandbox Data',
+    courses: [],
+    currentCourse: null,
+    currentLessonId: null
   },
 
   getAccountRole(account = this.state.account) {
@@ -116,6 +119,10 @@ const App = {
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const view = btn.dataset.view;
+        if (view === 'workspace') {
+          this.openCompilerForLanguage(this.state.currentLanguage || 'python');
+          return;
+        }
         if (view) {
           this.setRouteHash('#' + view);
         }
@@ -133,8 +140,8 @@ const App = {
           this.setRouteHash(targetHash);
           this.switchView(targetView);
         } else {
-          this.setRouteHash('#login');
-          this.switchView('student-login');
+          this.setRouteHash('#languages');
+          this.switchView('languages');
         }
       });
     }
@@ -333,6 +340,100 @@ const App = {
     if (returnChBtn) {
       returnChBtn.addEventListener('click', () => this.handleReturnToChallengeFromExample());
     }
+
+    // Beginner courses: back to the course list
+    const courseBackBtn = document.getElementById('course-back-btn');
+    if (courseBackBtn) {
+      courseBackBtn.addEventListener('click', () => {
+        this.setRouteHash('#courses');
+        this.renderCoursesView();
+      });
+    }
+
+    // Programiz-style Homepage Online Compiler tiles
+    document.querySelectorAll('.pz-compiler-tile[data-compiler-lang]').forEach(tile => {
+      tile.addEventListener('click', () => {
+        this.openCompilerForLanguage(tile.dataset.compilerLang);
+      });
+    });
+
+    // Programiz-style Vertical Language Icon Rail inside Workspace
+    document.querySelectorAll('.pz-rail-btn[data-rail-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openCompilerForLanguage(btn.dataset.railLang);
+      });
+    });
+
+    // Compiler toolbar actions
+    const clearCodeBtn = document.getElementById('compiler-clear-code-btn');
+    if (clearCodeBtn) {
+      clearCodeBtn.addEventListener('click', () => {
+        if (window.editorManager) window.editorManager.setValue('', this.state.currentLanguage || 'python');
+        this.hideErrorDetective();
+      });
+    }
+    const clearOutBtn = document.getElementById('compiler-clear-output-btn');
+    if (clearOutBtn) {
+      clearOutBtn.addEventListener('click', () => {
+        const container = document.getElementById('test-results-container');
+        const summary = document.getElementById('test-summary-box');
+        if (summary) summary.style.display = 'none';
+        if (container) {
+          container.innerHTML = '<div class="pz-empty-output">Output cleared. Click <strong>Run ▶</strong> to run your code.</div>';
+        }
+        this.hideErrorDetective();
+      });
+    }
+    const copyCodeBtn = document.getElementById('compiler-copy-btn');
+    if (copyCodeBtn) {
+      copyCodeBtn.addEventListener('click', () => {
+        const code = window.editorManager ? window.editorManager.getValue() : '';
+        this.copyCourseCode(code, copyCodeBtn);
+      });
+    }
+    const downloadCodeBtn = document.getElementById('compiler-download-btn');
+    if (downloadCodeBtn) {
+      downloadCodeBtn.addEventListener('click', () => this.handleDownloadCode());
+    }
+    const compilerThemeBtn = document.getElementById('compiler-theme-btn');
+    if (compilerThemeBtn) {
+      compilerThemeBtn.addEventListener('click', () => this.toggleTheme());
+    }
+
+    // Error Detective buttons
+    const edHintBtn = document.getElementById('ed-btn-hint');
+    if (edHintBtn) edHintBtn.addEventListener('click', () => this.handleErrorDetectiveAction('hint'));
+    const edExplainBtn = document.getElementById('ed-btn-explain');
+    if (edExplainBtn) edExplainBtn.addEventListener('click', () => this.handleErrorDetectiveAction('explain'));
+    const edFixBtn = document.getElementById('ed-btn-fix');
+    if (edFixBtn) edFixBtn.addEventListener('click', () => this.handleErrorDetectiveAction('fix'));
+    const edApplyBtn = document.getElementById('ed-apply-fix-btn');
+    if (edApplyBtn) edApplyBtn.addEventListener('click', () => this.applyErrorDetectiveFix());
+    const edCancelBtn = document.getElementById('ed-cancel-fix-btn');
+    if (edCancelBtn) edCancelBtn.addEventListener('click', () => this.cancelErrorDetectiveFix());
+    const edLineBtn = document.getElementById('ed-line-jump-btn');
+    if (edLineBtn) {
+      edLineBtn.addEventListener('click', () => {
+        const lineNum = parseInt(edLineBtn.dataset.line || '0', 10);
+        if (lineNum && window.editorManager && window.editorManager.revealLine) {
+          window.editorManager.revealLine(lineNum);
+        }
+      });
+    }
+
+    // Draggable vertical resizer between editor and output
+    this.initCompilerResizer();
+
+    // Ctrl+Enter shortcut to run code in Workspace
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && this.state.activeView === 'workspace') {
+        const runBtn = document.getElementById('run-tests-btn');
+        if (runBtn && !runBtn.disabled) {
+          e.preventDefault();
+          this.handleRunTests();
+        }
+      }
+    });
 
     // Admin Students Directory search input
     const adminStudentSearch = document.getElementById('admin-student-search-input');
@@ -1016,19 +1117,23 @@ const App = {
         return;
       }
     } catch (e) {
-      // Unauthenticated visitor
+      // Unauthenticated visitor — can browse Programiz-style homepage, courses, examples & compilers
       API.clearSession();
     }
 
     this.state.isAuthenticated = false;
     this.state.account = null;
     this.updateNavForAuth(false);
+    await Promise.all([this.loadLanguages(), this.loadExamplesCatalog(), this.loadPublicChallenges()]);
+    this.handleRouting();
+  },
 
-    const hash = window.location.hash;
-    if (hash === '#admin-login' || window.location.pathname.startsWith('/admin')) {
-      this.switchView('admin-login');
-    } else {
-      this.switchView('student-login');
+  async loadPublicChallenges() {
+    try {
+      const data = await API.getChallenges();
+      this.state.challenges = data.challenges || [];
+    } catch (e) {
+      this.state.challenges = [];
     }
   },
 
@@ -1036,6 +1141,9 @@ const App = {
     const mainNav = document.getElementById('main-nav-container');
     const navUser = document.getElementById('nav-user-container');
     const authBtns = document.getElementById('nav-auth-buttons');
+    const authOnlyItems = document.querySelectorAll('.auth-only-nav-item');
+    const publicItems = document.querySelectorAll('.public-nav-item');
+    const navAdminLi = document.getElementById('nav-admin-li');
 
     if (isAuth) {
       if (mainNav) mainNav.style.display = 'block';
@@ -1044,9 +1152,21 @@ const App = {
       this.updateRoleBasedNavigation();
       this.renderUserBadge();
     } else {
-      if (mainNav) mainNav.style.display = 'none';
+      if (mainNav) mainNav.style.display = 'block';
       if (navUser) navUser.style.display = 'none';
       if (authBtns) authBtns.style.display = 'flex';
+      publicItems.forEach(item => {
+        item.style.display = 'block';
+        item.hidden = false;
+      });
+      authOnlyItems.forEach(item => {
+        item.style.display = 'none';
+        item.hidden = true;
+      });
+      if (navAdminLi) {
+        navAdminLi.style.display = 'none';
+        navAdminLi.hidden = true;
+      }
     }
   },
 
@@ -1054,20 +1174,8 @@ const App = {
     const path = window.location.pathname;
     const hash = window.location.hash.replace('#', '');
 
-    // Unauthenticated user gating
-    if (!this.state.isAuthenticated || !this.state.account) {
-      if (hash === 'admin-login' || path.startsWith('/admin')) {
-        this.switchView('admin-login');
-      } else {
-        this.switchView('student-login');
-      }
-      return;
-    }
-
-    const isStaff = this.isStaffRole(this.state.account);
-
-    // Staff accounts (owner / teacher) always route to the Admin Console
-    if (isStaff) {
+    // Authenticated staff (owner / teacher) ALWAYS route to Admin Console
+    if (this.state.isAuthenticated && this.state.account && this.isStaffRole(this.state.account)) {
       if (window.location.hash !== '#admin') {
         this.setRouteHash('#admin');
       }
@@ -1075,19 +1183,46 @@ const App = {
       return;
     }
 
-    // Student accounts: block any admin route or login route and redirect to Student Portal (#languages)
-    if (
-      hash === 'login' ||
-      hash === 'student-login' ||
-      hash === 'admin-login' ||
-      hash === 'admin' ||
-      path.startsWith('/admin') ||
-      path.includes('/admin')
-    ) {
-      const targetView = this.getDefaultViewForRole(this.state.account);
-      const targetHash = this.getDefaultHashForRole(this.state.account);
-      this.setRouteHash(targetHash);
-      this.switchView(targetView);
+    // Unauthenticated visitors: allow login views + public learning views (Home, Courses, Compilers, Examples, Labs)
+    if (!this.state.isAuthenticated || !this.state.account) {
+      if (hash === 'admin-login' || hash === 'admin' || path.startsWith('/admin')) {
+        this.switchView('admin-login');
+        return;
+      }
+      if (hash === 'login' || hash === 'student-login' || path === '/login' || hash === 'dashboard' || hash === 'report') {
+        this.switchView('student-login');
+        return;
+      }
+    } else {
+      // Authenticated student: block admin/login routes and redirect to Student Portal
+      if (
+        hash === 'login' ||
+        hash === 'student-login' ||
+        hash === 'admin-login' ||
+        hash === 'admin' ||
+        path.startsWith('/admin') ||
+        path.includes('/admin')
+      ) {
+        const targetView = this.getDefaultViewForRole(this.state.account);
+        const targetHash = this.getDefaultHashForRole(this.state.account);
+        this.setRouteHash(targetHash);
+        this.switchView(targetView);
+        return;
+      }
+    }
+
+    // Direct Online Compiler route: #compiler/python, #compiler/sql, etc.
+    if (hash.startsWith('compiler/')) {
+      const langId = hash.split('/')[1] || 'python';
+      this.openCompilerForLanguage(langId);
+      return;
+    }
+
+    // Beginner courses: #courses, #courses/python, #courses/python/python_l3
+    if (hash === 'courses' || hash.startsWith('courses/')) {
+      const parts = hash.split('/').filter(Boolean);
+      this.switchView('courses');
+      if (parts[1]) this.openCourse(parts[1], parts[2] || null);
       return;
     }
 
@@ -1137,6 +1272,310 @@ const App = {
       const targetHash = this.getDefaultHashForRole(this.state.account);
       this.setRouteHash(targetHash);
       this.switchView(targetView);
+    }
+  },
+
+  // ==========================================================
+  // BEGINNER COURSES (student portal)
+  // Catalog -> course with ordered lessons -> lesson (explanation, example, exercise).
+  // Lesson content is public; progress is stored per student on the server.
+  // ==========================================================
+  courseStatusLabel(status) {
+    return { not_started: 'Not started', in_progress: 'In progress', completed: 'Completed' }[status] || 'Not started';
+  },
+
+  courseStatusPill(status) {
+    const safe = ['not_started', 'in_progress', 'completed'].includes(status) ? status : 'not_started';
+    return `<span class="lesson-status ${safe}">${this.courseStatusLabel(safe)}</span>`;
+  },
+
+  showCoursesNotice(message) {
+    const el = document.getElementById('courses-notice');
+    if (!el) return;
+    el.textContent = message || '';
+    el.hidden = !message;
+  },
+
+  async renderCoursesView() {
+    const catalog = document.getElementById('courses-catalog');
+    const detail = document.getElementById('course-detail');
+    const grid = document.getElementById('courses-grid');
+    if (!catalog || !detail || !grid) return;
+
+    detail.hidden = true;
+    catalog.hidden = false;
+    this.state.currentCourse = null;
+    this.state.currentLessonId = null;
+    grid.innerHTML = '';
+    this.showCoursesNotice('');
+
+    try {
+      const data = await API.getCourses();
+      this.state.courses = data.courses || [];
+      this.renderCoursesGrid();
+    } catch (e) {
+      this.showCoursesNotice(e.message || 'Courses could not be loaded.');
+    }
+  },
+
+  renderCoursesGrid() {
+    const grid = document.getElementById('courses-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    this.state.courses.forEach(c => {
+      const pct = Math.max(0, Math.min(100, Number(c.percent) || 0));
+      const actionLabel = c.status === 'completed' ? 'Review course' : (c.status === 'in_progress' ? 'Continue' : 'Start course');
+      const card = document.createElement('div');
+      card.className = 'course-card';
+      card.innerHTML = `
+        <div class="course-card-top">
+          <span class="course-icon" aria-hidden="true">${this.escapeHtml(c.icon)}</span>
+          <h3>${this.escapeHtml(c.name)}</h3>
+        </div>
+        <p>${this.escapeHtml(c.tagline)}</p>
+        <div class="course-progress-bar" role="progressbar" aria-label="${this.escapeHtml(c.name)} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+          <div class="course-progress-fill" style="width: ${pct}%"></div>
+        </div>
+        <div class="course-card-footer">
+          ${this.courseStatusPill(c.status)}
+          <span style="font-size: 0.78rem; color: var(--text-muted);">${Number(c.completed_count) || 0} of ${Number(c.lesson_count) || 0} lessons</span>
+          ${c.runnable ? '' : '<span class="lesson-status not_started" title="' + this.escapeHtml(c.note || '') + '">View only</span>'}
+        </div>
+        <button type="button" class="btn btn-primary">${actionLabel}</button>
+      `;
+      card.querySelector('button').addEventListener('click', () => this.openCourse(c.id, c.next_lesson_id));
+      grid.appendChild(card);
+    });
+  },
+
+  async openCourse(courseId, lessonId = null) {
+    try {
+      const course = await API.getCourse(courseId);
+      this.state.currentCourse = course;
+
+      const catalog = document.getElementById('courses-catalog');
+      const detail = document.getElementById('course-detail');
+      if (catalog) catalog.hidden = true;
+      if (detail) detail.hidden = false;
+
+      const requested = lessonId && course.lessons.some(l => l.id === lessonId) ? lessonId : null;
+      const target = requested || course.next_lesson_id || course.lessons[0].id;
+      this.renderCourseDetail(target);
+      this.setRouteHash(`#courses/${course.id}/${target}`);
+    } catch (e) {
+      const catalog = document.getElementById('courses-catalog');
+      const detail = document.getElementById('course-detail');
+      if (detail) detail.hidden = true;
+      if (catalog) catalog.hidden = false;
+      this.showCoursesNotice(e.message || 'This course could not be opened.');
+    }
+  },
+
+  renderCourseDetail(activeLessonId) {
+    const course = this.state.currentCourse;
+    if (!course) return;
+    this.state.currentLessonId = activeLessonId;
+
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    setText('course-detail-icon', course.icon);
+    setText('course-detail-name', course.name);
+    setText('course-detail-tagline', course.tagline);
+
+    const done = course.lessons.filter(l => l.status === 'completed').length;
+    const pct = course.lessons.length ? Math.round((100 * done) / course.lessons.length) : 0;
+    setText('course-progress-text', `${done} of ${course.lessons.length} lessons completed (${pct}%)`);
+    const fill = document.getElementById('course-progress-fill');
+    if (fill) fill.style.width = `${pct}%`;
+
+    const note = document.getElementById('course-runtime-note');
+    if (note) {
+      note.textContent = course.runnable ? '' : (course.note || '');
+      note.hidden = course.runnable || !course.note;
+    }
+
+    const list = document.getElementById('course-lesson-list');
+    if (list) {
+      list.innerHTML = '';
+      course.lessons.forEach(lesson => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'course-lesson-item' + (lesson.id === activeLessonId ? ' active' : '');
+        if (lesson.id === activeLessonId) btn.setAttribute('aria-current', 'step');
+        const dotContent = lesson.status === 'completed' ? '&#10003;' : String(lesson.order);
+        btn.innerHTML = `
+          <span class="lesson-dot ${this.escapeHtml(lesson.status)}" aria-hidden="true">${dotContent}</span>
+          <span>${this.escapeHtml(lesson.title)}<span class="sr-only"> (${this.courseStatusLabel(lesson.status)})</span></span>
+        `;
+        btn.addEventListener('click', () => {
+          this.renderCourseDetail(lesson.id);
+          this.setRouteHash(`#courses/${course.id}/${lesson.id}`);
+        });
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    }
+
+    const lesson = course.lessons.find(l => l.id === activeLessonId) || course.lessons[0];
+    this.renderCourseLesson(lesson);
+  },
+
+  renderCourseLesson(lesson) {
+    const course = this.state.currentCourse;
+    const pane = document.getElementById('course-lesson-pane');
+    if (!course || !pane) return;
+
+    const index = course.lessons.findIndex(l => l.id === lesson.id);
+    const prev = index > 0 ? course.lessons[index - 1] : null;
+    const next = index < course.lessons.length - 1 ? course.lessons[index + 1] : null;
+    const isWeb = course.id === 'html';
+    const canRun = Boolean(course.language) && Boolean(course.runnable);
+
+    let statusButtons = '';
+    if (lesson.status === 'not_started') {
+      statusButtons = `
+        <button type="button" class="btn btn-secondary" data-set-status="in_progress">Start lesson</button>
+        <button type="button" class="btn btn-primary" data-set-status="completed">Mark as completed</button>`;
+    } else if (lesson.status === 'in_progress') {
+      statusButtons = `
+        <button type="button" class="btn btn-primary" data-set-status="completed">Mark as completed</button>
+        <button type="button" class="btn btn-secondary" data-set-status="not_started">Reset</button>`;
+    } else {
+      statusButtons = `<button type="button" class="btn btn-secondary" data-set-status="not_started">Mark as not completed</button>`;
+    }
+
+    pane.innerHTML = `
+      <h3>${this.escapeHtml(lesson.title)}</h3>
+      <div class="course-lesson-meta">
+        <span>Lesson ${lesson.order} of ${course.lessons.length}</span>
+        ${this.courseStatusPill(lesson.status)}
+      </div>
+      <p><strong>${this.escapeHtml(lesson.summary)}</strong></p>
+      <p>${this.escapeHtml(lesson.explanation)}</p>
+
+      <div class="course-section-label">Example</div>
+      <div class="code-snippet-box">${this.escapeHtml(lesson.example)}</div>
+      <div class="course-section-label">${isWeb ? 'What you will see' : 'What it prints'}</div>
+      <pre class="example-output-pre course-expected">${this.escapeHtml(lesson.expected_output)}</pre>
+      ${lesson.sample_input ? `<p style="margin-top: 8px; font-size: 0.82rem;">When you run it in the Workspace, type <code>${this.escapeHtml(lesson.sample_input)}</code> in the Custom Input box first.</p>` : ''}
+      <div class="course-actions">
+        ${canRun ? '<button type="button" class="btn btn-primary" id="course-try-example">Try it in the Workspace</button>' : ''}
+        <button type="button" class="btn btn-secondary" id="course-copy-example">Copy example</button>
+      </div>
+
+      <div class="course-section-label">Your turn</div>
+      <div class="course-exercise">
+        <p>${this.escapeHtml(lesson.exercise.prompt)}</p>
+        <div class="course-actions" style="margin-top: 0;">
+          ${canRun ? '<button type="button" class="btn btn-primary" id="course-try-exercise">Open the exercise</button>' : ''}
+          <button type="button" class="btn btn-secondary" id="course-copy-exercise">Copy starter code</button>
+        </div>
+      </div>
+
+      <div class="course-section-label">Progress</div>
+      <div class="course-actions" id="course-status-actions">${statusButtons}</div>
+
+      <div class="course-pager">
+        ${prev ? '<button type="button" class="btn btn-secondary" id="course-prev">&larr; ' + this.escapeHtml(prev.title) + '</button>' : '<span></span>'}
+        ${next ? '<button type="button" class="btn btn-secondary" id="course-next">' + this.escapeHtml(next.title) + ' &rarr;</button>' : '<span></span>'}
+      </div>
+    `;
+
+    const goTo = (target) => {
+      this.renderCourseDetail(target.id);
+      this.setRouteHash(`#courses/${course.id}/${target.id}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    const prevBtn = pane.querySelector('#course-prev');
+    const nextBtn = pane.querySelector('#course-next');
+    if (prevBtn) prevBtn.addEventListener('click', () => goTo(prev));
+    if (nextBtn) nextBtn.addEventListener('click', () => goTo(next));
+
+    pane.querySelectorAll('[data-set-status]').forEach(btn => {
+      btn.addEventListener('click', () => this.setLessonStatus(lesson.id, btn.dataset.setStatus));
+    });
+
+    const tryExample = pane.querySelector('#course-try-example');
+    if (tryExample) tryExample.addEventListener('click', () => this.openCourseLessonInWorkspace(lesson, 'example'));
+    const tryExercise = pane.querySelector('#course-try-exercise');
+    if (tryExercise) tryExercise.addEventListener('click', () => this.openCourseLessonInWorkspace(lesson, 'exercise'));
+    const copyExample = pane.querySelector('#course-copy-example');
+    if (copyExample) copyExample.addEventListener('click', () => this.copyCourseCode(lesson.example, copyExample));
+    const copyExercise = pane.querySelector('#course-copy-exercise');
+    if (copyExercise) copyExercise.addEventListener('click', () => this.copyCourseCode(lesson.exercise.starter, copyExercise));
+  },
+
+  async copyCourseCode(text, button) {
+    const original = button.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = 'Copied!';
+    } catch (e) {
+      button.textContent = 'Copy failed: select the code and copy it manually';
+    }
+    setTimeout(() => { button.textContent = original; }, 1800);
+  },
+
+  async setLessonStatus(lessonId, status) {
+    const course = this.state.currentCourse;
+    if (!course) return;
+    try {
+      const res = await API.setLessonProgress(course.id, lessonId, status);
+      const lesson = course.lessons.find(l => l.id === lessonId);
+      if (lesson) lesson.status = res.status;
+      if (res.course) {
+        course.status = res.course.status;
+        course.completed_count = res.course.completed_count;
+        course.percent = res.course.percent;
+        course.next_lesson_id = res.course.next_lesson_id;
+      }
+      this.renderCourseDetail(lessonId);
+    } catch (e) {
+      alert(`Your progress could not be saved: ${e.message}`);
+    }
+  },
+
+  openCourseLessonInWorkspace(lesson, kind) {
+    const course = this.state.currentCourse;
+    if (!course || !course.language) return;
+    const isExercise = kind === 'exercise';
+    const code = isExercise ? lesson.exercise.starter : lesson.example;
+    const ext = course.file_ext || '';
+    const filename = course.language === 'java' ? 'Main.java' : `lesson_${lesson.order}${ext}`;
+    const exampleId = `${lesson.id}_${kind}`;
+
+    this.handleLoadExampleIntoEditor(course.language, {
+      id: exampleId,
+      title: `${lesson.title}${isExercise ? ' (exercise)' : ''}`,
+      category: `${course.name} course`,
+      explanation: isExercise ? lesson.exercise.prompt : lesson.summary,
+      filename,
+      code,
+      expected_output: isExercise ? '' : lesson.expected_output
+    });
+
+    // The loader asks for confirmation if the editor holds other code; only continue if it opened.
+    if (this.state.workspaceMode !== 'example' || !this.state.currentExample || this.state.currentExample.id !== exampleId) {
+      return;
+    }
+
+    const stdinEl = document.getElementById('custom-input-text');
+    if (stdinEl) stdinEl.value = lesson.sample_input || '';
+
+    // Opening the workspace for a lesson you have not started counts as starting it.
+    if (lesson.status === 'not_started') {
+      API.setLessonProgress(course.id, lesson.id, 'in_progress')
+        .then(res => {
+          lesson.status = res.status;
+          if (res.course) {
+            course.status = res.course.status;
+            course.completed_count = res.course.completed_count;
+            course.percent = res.course.percent;
+            course.next_lesson_id = res.course.next_lesson_id;
+          }
+        })
+        .catch(() => { /* progress is optional here; the lesson still opens */ });
     }
   },
 
@@ -1272,10 +1711,15 @@ const App = {
     const adminSettingsTabBtn = document.getElementById('admin-settings-tab-btn');
     const viewAdminSec = document.getElementById('view-admin');
 
-    // Keep SkillProof hidden from student navigation (preserved for future use & staff inspection)
+    // Keep SkillProof & Examples hidden from student navigation
     if (navSkillproofLi) {
       navSkillproofLi.style.display = 'none';
       navSkillproofLi.hidden = true;
+    }
+    const navExamplesLi = document.getElementById('nav-examples-li');
+    if (navExamplesLi) {
+      navExamplesLi.style.display = 'none';
+      navExamplesLi.hidden = true;
     }
 
     if (role === 'owner') {
@@ -1429,6 +1873,8 @@ const App = {
 
     if (viewName === 'languages') {
       this.renderLanguagesGrid();
+    } else if (viewName === 'courses') {
+      this.renderCoursesView();
     } else if (viewName === 'examples') {
       this.renderExamplesView();
     } else if (viewName === 'dashboard') {
@@ -1442,13 +1888,10 @@ const App = {
     } else if (viewName === 'missions') {
       this.renderChallengesGrid();
     } else if (viewName === 'workspace') {
-      if (this.state.workspaceMode !== 'example' && !this.state.currentChallenge && this.state.challenges.length > 0) {
-        const prog = this.state.studentProgress || { completed_challenges: [] };
-        const completedSet = new Set((prog.completed_challenges || []).map(c => c.challenge_id));
-        const nextChallenge = this.state.challenges.find(c => !completedSet.has(c.id)) || this.state.challenges[0];
-        if (nextChallenge) {
-          this.openMission(nextChallenge.id);
-        }
+      if (this.state.workspaceMode !== 'example' && !this.state.currentChallenge) {
+        this.openCompilerForLanguage(this.state.currentLanguage || 'python', true);
+      } else {
+        this.syncCompilerChrome(this.state.currentLanguage || 'python');
       }
     }
   },
@@ -2246,6 +2689,7 @@ const App = {
     const scenarioEl = document.getElementById('mission-scenario-text');
     if (scenarioEl) scenarioEl.textContent = example.explanation || example.description;
 
+    this.syncCompilerChrome(langId);
     this.updateRuntimeBadge(langId);
 
     // HTML Preview
@@ -2685,19 +3129,354 @@ const App = {
     }
   },
 
+  COMPILER_META: {
+    python: {
+      title: 'Python Online Compiler',
+      badge: 'Py',
+      filename: 'main.py',
+      starter: '# Online Python Compiler\n# Write and run Python code below\n\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("World"))\n'
+    },
+    c: {
+      title: 'C Online Compiler',
+      badge: 'C',
+      filename: 'main.c',
+      starter: '// Online C Compiler\n// Write and run C code below\n\n#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n'
+    },
+    cpp: {
+      title: 'C++ Online Compiler',
+      badge: 'C++',
+      filename: 'main.cpp',
+      starter: '// Online C++ Compiler\n// Write and run C++ code below\n\n#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}\n'
+    },
+    java: {
+      title: 'Java Online Compiler',
+      badge: 'Java',
+      filename: 'Main.java',
+      starter: '// Online Java Compiler\n// Write and run Java code below\n\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}\n'
+    },
+    javascript: {
+      title: 'JavaScript Online Compiler',
+      badge: 'JS',
+      filename: 'main.js',
+      starter: '// Online JavaScript Compiler\n// Write and run JavaScript code below\n\nconsole.log("Hello, World!");\n'
+    },
+    typescript: {
+      title: 'TypeScript Online Editor',
+      badge: 'TS',
+      filename: 'main.ts',
+      starter: '// Online TypeScript Editor\nconst greeting: string = "Hello, TypeScript!";\nconsole.log(greeting);\n'
+    },
+    sql: {
+      title: 'Online SQL Editor',
+      badge: 'SQL',
+      filename: 'query.sql',
+      starter: '-- Online SQL Editor\n-- Run SQL queries against the Customers, Orders, and resources tables\n\nSELECT first_name, last_name, age, country\nFROM Customers;\n'
+    },
+    html: {
+      title: 'HTML & CSS Online Editor',
+      badge: 'HTML',
+      filename: 'index.html',
+      starter: '<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Inter, sans-serif; padding: 24px; }\n    h1 { color: #0556F3; }\n  </style>\n</head>\n<body>\n  <h1>Hello, World!</h1>\n  <p>Edit this HTML &amp; CSS and click Run to see your live preview.</p>\n</body>\n</html>\n'
+    }
+  },
+
+  isRunnableInCurrentEnv(lang) {
+    if (lang === 'html' || lang === 'javascript') return true;
+    const rt = this.state.runtimes[lang];
+    return Boolean(rt && rt.available);
+  },
+
+  syncCompilerChrome(lang) {
+    const meta = this.COMPILER_META[lang] || this.COMPILER_META.python;
+    const heading = document.getElementById('compiler-heading-title');
+    const badgeDot = document.getElementById('compiler-lang-badge');
+    const fileTab = document.getElementById('current-file-tab');
+    const langSelect = document.getElementById('editor-language-select');
+    const sqlSchema = document.getElementById('pz-sql-schema');
+    const sqlPreview = document.getElementById('pz-sql-tables-preview');
+    const previewContainer = document.getElementById('html-preview-container');
+
+    if (heading) heading.textContent = meta.title;
+    if (badgeDot) badgeDot.textContent = meta.badge;
+    if (fileTab && this.state.workspaceMode === 'example') fileTab.textContent = meta.filename;
+    if (langSelect) langSelect.value = lang;
+
+    document.querySelectorAll('.pz-rail-btn[data-rail-lang]').forEach(btn => {
+      const isCurrent = btn.dataset.railLang === lang;
+      btn.classList.toggle('active', isCurrent);
+      btn.hidden = !isCurrent;
+      btn.style.display = isCurrent ? 'inline-flex' : 'none';
+    });
+
+    if (sqlSchema) sqlSchema.hidden = (lang !== 'sql');
+    if (sqlPreview) sqlPreview.hidden = (lang !== 'sql');
+    if (previewContainer) {
+      previewContainer.style.display = (lang === 'html') ? 'block' : 'none';
+    }
+    this.updateRuntimeBadge(lang);
+  },
+
+  openCompilerForLanguage(langId, alreadySwitching = false) {
+    const lang = this.COMPILER_META[langId] ? langId : 'python';
+    const meta = this.COMPILER_META[lang];
+    this._compilerDrafts = this._compilerDrafts || {};
+
+    // Save current standalone draft before switching languages
+    if (this.state.workspaceMode === 'example' && this.state.currentLanguage && window.editorManager) {
+      const prevCode = window.editorManager.getValue();
+      if (prevCode && prevCode.trim()) {
+        this._compilerDrafts[this.state.currentLanguage] = prevCode;
+      }
+    }
+
+    this.state.workspaceMode = 'example';
+    this.state.currentLanguage = lang;
+    this.state.currentExample = {
+      id: `compiler_${lang}`,
+      title: meta.title,
+      category: 'Online Compiler',
+      explanation: `Write and run ${meta.title} code.`,
+      filename: meta.filename,
+      code: meta.starter
+    };
+
+    const codeToLoad = this._compilerDrafts[lang] || meta.starter;
+    if (window.editorManager) {
+      window.editorManager.setValue(codeToLoad, lang);
+    }
+
+    const exBanner = document.getElementById('workspace-example-banner');
+    if (exBanner) exBanner.style.display = 'none';
+    const recapContainer = document.getElementById('concept-recap-container');
+    if (recapContainer) recapContainer.style.display = 'none';
+    const summaryBox = document.getElementById('test-summary-box');
+    if (summaryBox) summaryBox.style.display = 'none';
+    const container = document.getElementById('test-results-container');
+    if (container) {
+      container.innerHTML = `<div class="pz-empty-output">Click <strong>Run ▶</strong> to execute your ${this.escapeHtml(meta.badge)} code.</div>`;
+    }
+    this.hideErrorDetective();
+
+    if (lang === 'html') {
+      this.updateHtmlPreview(codeToLoad);
+    }
+
+    this.syncCompilerChrome(lang);
+    if (!alreadySwitching) {
+      this.setRouteHash(`#compiler/${lang}`);
+      this.switchView('workspace');
+    }
+    this.switchRightTab('output');
+  },
+
+  handleDownloadCode() {
+    const lang = this.state.currentLanguage || 'python';
+    const meta = this.COMPILER_META[lang] || this.COMPILER_META.python;
+    const code = window.editorManager ? window.editorManager.getValue() : '';
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = meta.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  initCompilerResizer() {
+    const resizer = document.getElementById('pz-resizer');
+    const editorPane = document.getElementById('pz-editor-pane');
+    const outputPane = document.getElementById('pz-output-pane');
+    const shell = document.getElementById('pz-ide-shell');
+    if (!resizer || !editorPane || !outputPane || !shell) return;
+
+    let dragging = false;
+    resizer.addEventListener('mousedown', (e) => {
+      dragging = true;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = shell.getBoundingClientRect();
+      const railWidth = 54 + (document.getElementById('pz-sql-schema')?.hidden ? 0 : 180);
+      const avail = rect.width - railWidth - 6;
+      const offset = e.clientX - rect.left - railWidth;
+      const pct = Math.max(25, Math.min(75, (offset / avail) * 100));
+      editorPane.style.flex = `0 0 ${pct}%`;
+      outputPane.style.flex = `1 1 ${100 - pct}%`;
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+    });
+  },
+
+  renderSqlTablesHtml(tables) {
+    if (!Array.isArray(tables) || tables.length === 0) return '';
+    return tables.map((tbl) => {
+      const ths = (tbl.columns || []).map(col => `<th>${this.escapeHtml(col)}</th>`).join('');
+      const trs = (tbl.rows || []).map(row =>
+        `<tr>${row.map(cell => `<td>${this.escapeHtml(cell === null ? 'NULL' : cell)}</td>`).join('')}</tr>`
+      ).join('');
+      return `
+        <div class="pz-sql-mini-table-wrap" style="margin-top: 8px;">
+          <table class="pz-sql-table">
+            <thead><tr>${ths}</tr></thead>
+            <tbody>${trs || `<tr><td colspan="${(tbl.columns || []).length || 1}">(0 rows)</td></tr>`}</tbody>
+          </table>
+        </div>
+      `;
+    }).join('');
+  },
+
+  // ==========================================================
+  // ERROR DETECTIVE PANEL
+  // ==========================================================
+  showErrorDetective(errorText, code, language) {
+    const panel = document.getElementById('error-detective-panel');
+    if (!panel || !window.ErrorDetective) return;
+
+    const diag = window.ErrorDetective.diagnoseError(errorText, code, language);
+    this._edContext = { errorText, code, language, diag, pendingFixCode: null };
+
+    const titleEl = document.getElementById('ed-error-title');
+    const rawEl = document.getElementById('ed-raw-error');
+    const plainEl = document.getElementById('ed-plain-explanation');
+    const uncertainEl = document.getElementById('ed-uncertain-note');
+    const lineBtn = document.getElementById('ed-line-jump-btn');
+    const respBox = document.getElementById('ed-response-box');
+    const fixBox = document.getElementById('ed-fix-compare');
+
+    if (titleEl) titleEl.textContent = diag.title;
+    if (rawEl) rawEl.textContent = String(errorText || '');
+    if (plainEl) plainEl.textContent = diag.plain;
+    if (uncertainEl) {
+      if (diag.uncertain) {
+        uncertainEl.textContent = 'Uncertain diagnosis: ' + diag.hint;
+        uncertainEl.hidden = false;
+      } else {
+        uncertainEl.hidden = true;
+      }
+    }
+    if (lineBtn) {
+      if (diag.lineNumber) {
+        lineBtn.textContent = `Jump to line ${diag.lineNumber}`;
+        lineBtn.dataset.line = String(diag.lineNumber);
+        lineBtn.hidden = false;
+      } else {
+        lineBtn.hidden = true;
+      }
+    }
+    if (respBox) respBox.hidden = true;
+    if (fixBox) fixBox.hidden = true;
+    panel.hidden = false;
+  },
+
+  hideErrorDetective() {
+    const panel = document.getElementById('error-detective-panel');
+    if (panel) panel.hidden = true;
+    this._edContext = null;
+  },
+
+  async handleErrorDetectiveAction(action) {
+    const ctx = this._edContext;
+    if (!ctx) return;
+
+    const respBox = document.getElementById('ed-response-box');
+    const respMeta = document.getElementById('ed-response-meta');
+    const respText = document.getElementById('ed-response-text');
+    const fixBox = document.getElementById('ed-fix-compare');
+    const diffView = document.getElementById('ed-diff-view');
+
+    if (respBox) respBox.hidden = false;
+    if (respMeta) respMeta.textContent = 'Checking Error Detective...';
+    if (respText) respText.textContent = 'Analyzing your error...';
+    if (fixBox) fixBox.hidden = true;
+
+    const lessonContext = this.state.currentChallenge
+      ? `${this.state.currentChallenge.title}: ${this.state.currentChallenge.prompt}`
+      : (this.state.currentExample ? this.state.currentExample.title : null);
+
+    let aiRes = null;
+    try {
+      aiRes = await API.requestErrorHelp({
+        code: ctx.code,
+        language: ctx.language,
+        errorMessage: ctx.errorText,
+        action,
+        lessonContext
+      });
+    } catch (e) {
+      aiRes = { ai_configured: false, source: 'builtin', message: '' };
+    }
+
+    if (aiRes && aiRes.source === 'gemini') {
+      if (respMeta) respMeta.textContent = `Live AI Tutor (${action})`;
+      if (respText) respText.textContent = aiRes.message;
+      if (action === 'fix' && aiRes.suggested_code && aiRes.suggested_code !== ctx.code) {
+        ctx.pendingFixCode = aiRes.suggested_code;
+        if (diffView) diffView.innerHTML = window.ErrorDetective.buildLineDiffHtml(ctx.code, aiRes.suggested_code);
+        if (fixBox) fixBox.hidden = false;
+      }
+      return;
+    }
+
+    // Built-in honest fallback when AI is not configured or unavailable
+    const aiNotice = aiRes && aiRes.message
+      ? aiRes.message
+      : 'AI help is not configured on this server (no GEMINI_API_KEY). Showing built-in Error Detective analysis.';
+
+    if (action === 'hint') {
+      if (respMeta) respMeta.textContent = 'Built-in Hint • Live AI not configured';
+      if (respText) respText.textContent = `${ctx.diag.hint}\n\nNote: ${aiNotice}`;
+    } else if (action === 'explain') {
+      if (respMeta) respMeta.textContent = 'Built-in Explanation • Live AI not configured';
+      const lineInfo = ctx.diag.lineNumber ? `Look closely at line ${ctx.diag.lineNumber}. ` : '';
+      if (respText) respText.textContent = `${ctx.diag.plain} ${lineInfo}${ctx.diag.hint}\n\nNote: ${aiNotice}`;
+    } else if (action === 'fix') {
+      if (ctx.diag.suggested && ctx.diag.suggested.code && ctx.diag.suggested.code !== ctx.code) {
+        if (respMeta) respMeta.textContent = 'Built-in Suggested Fix • Review before applying';
+        if (respText) respText.textContent = `${ctx.diag.suggested.note}\n\nNote: ${aiNotice}`;
+        ctx.pendingFixCode = ctx.diag.suggested.code;
+        if (diffView) diffView.innerHTML = window.ErrorDetective.buildLineDiffHtml(ctx.code, ctx.diag.suggested.code);
+        if (fixBox) fixBox.hidden = false;
+      } else {
+        if (respMeta) respMeta.textContent = 'No automatic fix available • Built-in Error Detective';
+        if (respText) respText.textContent = `Error Detective is not certain enough to auto-fix this error safely. ${ctx.diag.hint}\n\nNote: ${aiNotice}`;
+      }
+    }
+  },
+
+  applyErrorDetectiveFix() {
+    const ctx = this._edContext;
+    if (!ctx || !ctx.pendingFixCode || !window.editorManager) return;
+    window.editorManager.setValue(ctx.pendingFixCode, ctx.language);
+    const fixBox = document.getElementById('ed-fix-compare');
+    if (fixBox) fixBox.hidden = true;
+    ctx.pendingFixCode = null;
+    const respText = document.getElementById('ed-response-text');
+    if (respText) respText.textContent = 'Fix applied to the editor. Click Run ▶ to test your updated code.';
+  },
+
+  cancelErrorDetectiveFix() {
+    const fixBox = document.getElementById('ed-fix-compare');
+    if (fixBox) fixBox.hidden = true;
+    if (this._edContext) this._edContext.pendingFixCode = null;
+  },
+
   handleLanguageChange(lang) {
     this.state.currentLanguage = lang;
     window.editorManager.setLanguage(lang);
-    this.updateRuntimeBadge(lang);
+    this.syncCompilerChrome(lang);
     this.renderWorkspaceFiles(this.state.currentChallenge, lang);
 
-    // Toggle HTML preview
-    const previewContainer = document.getElementById('html-preview-container');
-    if (previewContainer) {
-      previewContainer.style.display = (lang === 'html') ? 'block' : 'none';
-      if (lang === 'html') {
-        this.updateHtmlPreview(window.editorManager.getValue());
-      }
+    if (lang === 'html') {
+      this.updateHtmlPreview(window.editorManager.getValue());
     }
   },
 
@@ -2715,17 +3494,21 @@ const App = {
     const warningTitle = document.getElementById('runtime-warning-title');
 
     const rt = this.state.runtimes[lang] || { available: false, name: lang };
+    const isBrowserJs = (lang === 'javascript' && !rt.available);
+    const isCloudSupported = ['c', 'cpp', 'java', 'typescript', 'javascript'].includes(lang);
     const isExampleMode = this.state.workspaceMode === 'example';
+    const isRunnable = Boolean(rt.available) || lang === 'html' || isBrowserJs || (isExampleMode && isCloudSupported);
     const runButton = document.getElementById('run-tests-btn');
     const submitButton = document.getElementById('submit-mission-btn');
+
     if (runButton) {
-      runButton.disabled = !rt.available;
+      runButton.disabled = !isRunnable;
       if (isExampleMode) {
-        runButton.innerHTML = rt.available ? '<span>▶</span> Run Example' : 'View only';
-        runButton.title = rt.available ? 'Run this code example in the language runner.' : `${rt.name} toolchain is not installed (View only).`;
+        runButton.innerHTML = isRunnable ? (lang === 'sql' ? 'Run SQL ▶' : 'Run ▶') : 'View only';
+        runButton.title = isRunnable ? 'Run your code (Ctrl+Enter)' : `${rt.name} compiler is not available.`;
       } else {
-        runButton.innerHTML = '<span>▶</span> Run Tests';
-        runButton.title = rt.available ? 'Run the lab tests.' : (rt.description || `${rt.name} execution is unavailable on this server.`);
+        runButton.innerHTML = 'Run Tests ▶';
+        runButton.title = isRunnable ? 'Run the lab tests.' : (rt.description || `${rt.name} execution is unavailable on this server.`);
       }
     }
     if (submitButton) {
@@ -2734,19 +3517,27 @@ const App = {
       submitButton.title = rt.available ? 'Submit your verified solution.' : (rt.description || `${rt.name} execution is unavailable on this server.`);
     }
 
-    if (rt.available) {
-      badge.textContent = '● Available';
-      badge.style.background = 'rgba(15, 159, 130, 0.12)';
-      badge.style.color = 'var(--teal-success)';
-      if (warningBanner) warningBanner.style.display = 'none';
-    } else {
-      badge.textContent = '⚪ Not installed (View only)';
-      badge.style.background = 'var(--bg-subtle)';
-      badge.style.color = 'var(--text-muted)';
-      if (warningBanner) {
-        warningBanner.style.display = 'block';
-        warningTitle.textContent = `${rt.name} Not Installed (View only):`;
-        warningText.textContent = `${rt.description || 'Toolchain is not installed on this host.'} Switch to Python, SQL, or HTML/CSS to run code on this host.`;
+    if (badge) {
+      if (rt.available) {
+        badge.textContent = '● Ready';
+        badge.style.color = 'var(--teal-success)';
+        if (warningBanner) warningBanner.style.display = 'none';
+      } else if (isBrowserJs) {
+        badge.textContent = '● Ready (Browser Sandbox)';
+        badge.style.color = 'var(--teal-success)';
+        if (warningBanner) warningBanner.style.display = 'none';
+      } else if (isExampleMode && isCloudSupported) {
+        badge.textContent = '● Ready (Cloud Sandbox)';
+        badge.style.color = 'var(--teal-success)';
+        if (warningBanner) warningBanner.style.display = 'none';
+      } else {
+        badge.textContent = '⚪ Compiler not installed (View only)';
+        badge.style.color = 'var(--text-muted)';
+        if (warningBanner) {
+          warningBanner.style.display = 'block';
+          warningTitle.textContent = `${rt.name || lang} Not Installed (View only):`;
+          warningText.textContent = `${rt.description || 'Toolchain is not installed on this server.'}`;
+        }
       }
     }
   },
@@ -2771,56 +3562,69 @@ const App = {
     const customInputEl = document.getElementById('custom-input-text');
     const stdinText = customInputEl ? customInputEl.value : '';
 
-    // If in Example Mode, run the example with API.runCode (do NOT claim it passed challenge tests)
+    // Standalone Online Compiler / Example Mode
     if (this.state.workspaceMode === 'example') {
       const runBtn = document.getElementById('run-tests-btn');
       if (runBtn) {
-        runBtn.innerHTML = '<span>⏳</span> Running...';
+        runBtn.innerHTML = '⏳ Running...';
         runBtn.disabled = true;
       }
       try {
         if (lang === 'html') {
           this.updateHtmlPreview(code);
         }
-        const res = await API.runCode(code, lang, stdinText);
+
+        const rt = this.state.runtimes[lang] || { available: false };
+        let res;
+        if (lang === 'javascript' && !rt.available && window.ErrorDetective) {
+          res = await window.ErrorDetective.runJavaScriptInBrowser(code);
+        } else {
+          res = await API.runCode(code, lang, stdinText);
+        }
+
         const summaryBox = document.getElementById('test-summary-box');
         const container = document.getElementById('test-results-container');
-        if (summaryBox) {
-          summaryBox.style.display = 'flex';
-          summaryBox.className = `output-summary-header ${res.ran ? 'passed' : 'failed'}`;
-          summaryBox.innerHTML = `
-            <div>
-              <strong style="font-size: 0.95rem;">${res.ran ? '▶ Example Output' : (res.mode_label === 'View only' ? '👁️ View only — Toolchain Not Installed' : '⚠️ Execution Error')}</strong>
-              <div style="font-size: 0.75rem; margin-top: 2px;">${this.escapeHtml(res.message || '')}</div>
-            </div>
-          `;
-        }
+        const hasError = Boolean(res.error) || res.success === false;
+
+        if (summaryBox) summaryBox.style.display = 'none';
+
         if (container) {
-          if (res.ran) {
+          if (res.ran && !hasError) {
+            const sqlTableHtml = (lang === 'sql' && res.tables && res.tables.length)
+              ? this.renderSqlTablesHtml(res.tables)
+              : '';
             container.innerHTML = `
               <div class="test-item-card passed">
                 <div class="test-item-top">
                   <span class="test-name">${this.escapeHtml(res.runtime_label || lang)} Output</span>
-                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--teal-success);">${res.duration_ms || 0} ms</span>
+                  <span style="font-size: 0.74rem; font-weight: 700; color: var(--teal-success);">✓ Success</span>
                 </div>
-                <pre class="example-output-pre" style="margin-top: 6px;">${this.escapeHtml(res.output || '(Program finished with no output)')}</pre>
+                ${sqlTableHtml || `<pre class="example-output-pre" style="margin-top: 6px;">${this.escapeHtml(res.output || '(Program finished with no output)')}</pre>`}
               </div>
             `;
+            this.hideErrorDetective();
           } else {
+            const errText = res.error || res.message || 'Execution failed.';
             container.innerHTML = `
               <div class="test-item-card failed">
                 <div class="test-item-top">
-                  <span class="test-name">${res.mode_label === 'View only' ? 'View only' : 'Error Details'}</span>
-                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--red-error);">${this.escapeHtml(res.status_label || 'Error')}</span>
+                  <span class="test-name">${res.mode_label === 'View only' ? 'View only' : 'Program Error'}</span>
+                  <span style="font-size: 0.74rem; font-weight: 700; color: var(--red-error);">${this.escapeHtml(res.status_label || 'Error')}</span>
                 </div>
-                <pre class="example-output-pre live-output error" style="margin-top: 6px;">${this.escapeHtml(res.error || res.message || 'Execution failed.')}</pre>
+                ${res.output ? `<pre class="example-output-pre" style="margin-top: 6px;">${this.escapeHtml(res.output)}</pre>` : ''}
+                <pre class="example-output-pre live-output error" style="margin-top: 6px;">${this.escapeHtml(errText)}</pre>
               </div>
             `;
+            if (res.mode_label !== 'View only') {
+              this.showErrorDetective(errText, code, lang);
+            } else {
+              this.hideErrorDetective();
+            }
           }
         }
         this.switchRightTab('output');
       } catch (err) {
-        alert(`Execution error: ${err.message}`);
+        this.showErrorDetective(err.message || 'Execution error', code, lang);
       } finally {
         this.updateRuntimeBadge(lang);
       }
@@ -2832,11 +3636,10 @@ const App = {
 
     const runBtn = document.getElementById('run-tests-btn');
     const originalText = runBtn.innerHTML;
-    runBtn.innerHTML = `<span>⏳</span> Running...`;
+    runBtn.innerHTML = `⏳ Running...`;
     runBtn.disabled = true;
 
     try {
-      // If HTML, update live preview frame
       if (lang === 'html') {
         this.updateHtmlPreview(code);
       }
@@ -2844,12 +3647,15 @@ const App = {
       const report = await API.submitAttempt(challengeId, code, lang);
       this.state.recentError = report.error_summary || null;
       this.renderAttemptResult(report);
+      if (!report.passed && report.error_summary && report.runtime_available !== false) {
+        this.showErrorDetective(report.error_summary, code, lang);
+      } else {
+        this.hideErrorDetective();
+      }
       this.switchRightTab('output');
 
-      // Refresh student progress
       await this.refreshStudentStats();
 
-      // If passed, display celebratory confetti and concept recap
       if (report.passed) {
         this.displayPostChallengeRecap(this.state.currentChallenge);
         if (report.xp_earned > 0) {

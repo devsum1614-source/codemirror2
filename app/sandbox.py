@@ -12,7 +12,7 @@ import json
 import sqlite3
 import tempfile
 import subprocess
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from app.runtimes import check_language_runtime
 
@@ -42,6 +42,36 @@ INSERT INTO resources (id, title, category_id, status, created_at) VALUES
 (102, 'Old Newsletter Archive', 2, 'archived', '2026-09-01 12:00:00'),
 (103, 'Resume Review Session', 3, 'active', '2026-10-15 14:00:00'),
 (104, 'VR Development Kit', 1, 'active', '2026-10-20 09:30:00');
+
+CREATE TABLE Customers (
+    customer_id INTEGER PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    age INTEGER,
+    country TEXT
+);
+
+CREATE TABLE Orders (
+    order_id INTEGER PRIMARY KEY,
+    item TEXT NOT NULL,
+    amount INTEGER,
+    customer_id INTEGER,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+INSERT INTO Customers (customer_id, first_name, last_name, age, country) VALUES
+(1, 'John', 'Doe', 31, 'USA'),
+(2, 'Robert', 'Luna', 22, 'USA'),
+(3, 'David', 'Robinson', 22, 'UK'),
+(4, 'John', 'Reinhardt', 25, 'UK'),
+(5, 'Betty', 'Doe', 28, 'UAE');
+
+INSERT INTO Orders (order_id, item, amount, customer_id) VALUES
+(1, 'Keyboard', 400, 4),
+(2, 'Mouse', 300, 4),
+(3, 'Monitor', 12000, 3),
+(4, 'Keyboard', 400, 1),
+(5, 'Mousepad', 250, 2);
 """
 
 # Python standalone snippet runner template (blocks network access)
@@ -254,6 +284,79 @@ def _split_sql_statements(sql_text: str) -> List[str]:
     return statements
 
 
+JUDGE0_LANGUAGE_IDS = {
+    "c": 50,           # C (GCC 9.2.0)
+    "cpp": 54,         # C++ (GCC 9.2.0)
+    "java": 62,        # Java (OpenJDK 13.0.1)
+    "javascript": 63,  # JavaScript (Node.js 12.14.0)
+    "typescript": 74,  # TypeScript (3.7.4)
+    "python": 71,      # Python (3.8.1)
+}
+
+
+def _execute_via_judge0(
+    lang_id: str,
+    lang_name: str,
+    code: str,
+    stdin_text: str = "",
+    timeout_seconds: float = 12.0,
+) -> Optional[Dict[str, Any]]:
+    """
+    Executes code in an isolated remote Judge0 CE sandbox when a local compiler
+    is not installed on this host. Returns None if Judge0 CE is unreachable.
+    """
+    judge0_lang_id = JUDGE0_LANGUAGE_IDS.get(lang_id)
+    if not judge0_lang_id:
+        return None
+    if os.environ.get("DISABLE_REMOTE_SANDBOX") == "1":
+        return None
+
+    import urllib.request
+
+    payload = json.dumps({
+        "language_id": judge0_lang_id,
+        "source_code": code or "",
+        "stdin": stdin_text or "",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://ce.judge0.com/submissions?base64_encoded=false&wait=true",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "CodeWizard/2.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    status_obj = data.get("status") or {}
+    status_id = status_obj.get("id", 0)
+    status_desc = status_obj.get("description") or "Completed"
+    stdout = (data.get("stdout") or "").rstrip()
+    compile_out = (data.get("compile_output") or "").strip()
+    stderr = (data.get("stderr") or "").strip()
+    err_parts = [p for p in (compile_out, stderr) if p]
+    error_text = "\n".join(err_parts) if err_parts else (None if status_id == 3 else status_desc)
+    success = (status_id == 3) and not error_text
+
+    return {
+        "language": lang_id,
+        "language_name": lang_name,
+        "runtime_label": f"{lang_name} Cloud Sandbox",
+        "runtime_available": True,
+        "status_label": "Available",
+        "mode_label": "Runnable",
+        "ran": True,
+        "success": success,
+        "output": stdout,
+        "error": error_text,
+    }
+
+
 def execute_code_snippet(
     code: str,
     language: str = "python",
@@ -262,13 +365,33 @@ def execute_code_snippet(
 ) -> Dict[str, Any]:
     """
     Runs a standalone code example or student program in an isolated, time-limited environment
-    using the language's actual compiler, interpreter, or runtime.
-    Never claims fake execution when a toolchain is not installed.
+    using the language's actual compiler, interpreter, or runtime (falling back to the isolated
+    Judge0 CE cloud sandbox when a local compiler is not installed).
     """
-    lang_info = check_language_runtime(language)
-    lang_id = lang_info.get("id", (language or "python").lower())
+    raw_norm = (language or "python").lower().strip()
+    if raw_norm in ("ts", "typescript"):
+        lang_id = "typescript"
+        lang_info = {
+            "id": "typescript",
+            "name": "TypeScript",
+            "runtime_label": "TypeScript Compiler",
+            "available": False,
+            "setup_guide": {"title": "TypeScript Setup", "command": "tsc --version"},
+        }
+    else:
+        lang_info = check_language_runtime(language)
+        lang_id = lang_info.get("id", raw_norm)
 
     if not lang_info["available"]:
+        remote_result = _execute_via_judge0(
+            lang_id=lang_id,
+            lang_name=lang_info.get("name", lang_id.upper()),
+            code=code,
+            stdin_text=stdin_text,
+        )
+        if remote_result is not None:
+            return remote_result
+
         return {
             "language": lang_id,
             "language_name": lang_info["name"],
@@ -280,8 +403,8 @@ def execute_code_snippet(
             "success": False,
             "output": "",
             "error": (
-                f"{lang_info['name']} ({lang_info.get('runtime_label', 'compiler/runtime')}) is not installed on this server. "
-                "This example is View only and was not executed."
+                f"{lang_info['name']} ({lang_info.get('runtime_label', 'compiler/runtime')}) is not installed on this server "
+                "and the remote sandbox could not be reached."
             ),
             "setup_guide": lang_info.get("setup_guide", {}),
         }
@@ -325,12 +448,14 @@ def execute_code_snippet(
                 }
 
             outputs: List[str] = []
+            tables: List[Dict[str, Any]] = []
             for stmt in statements:
                 cur.execute(stmt)
                 if cur.description:
                     cols = [d[0] for d in cur.description]
                     rows = cur.fetchall()
                     outputs.append(_format_sql_table(cols, rows))
+                    tables.append({"columns": cols, "rows": [list(r) for r in rows]})
 
             conn.commit()
             final_output = "\n\n".join(outputs) if outputs else "SQL statement executed."
@@ -344,6 +469,7 @@ def execute_code_snippet(
                 "ran": True,
                 "success": True,
                 "output": final_output,
+                "tables": tables,
                 "error": None,
             }
         except Exception as sql_err:

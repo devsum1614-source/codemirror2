@@ -15,6 +15,7 @@ from app.runner import run_tests_for_mission
 from app.ai_coach import get_staged_hint
 from app.routes_v1 import router as v1_router
 from app.routes_admin import router as admin_router
+from app.routes_courses import router as courses_router
 
 # Initialize database and seeds on startup
 init_db()
@@ -39,6 +40,7 @@ async def disable_static_cache(request, call_next):
 # Mount versioned API routes
 app.include_router(v1_router)
 app.include_router(admin_router)
+app.include_router(courses_router)
 
 @app.get("/health")
 def root_health():

@@ -268,6 +268,47 @@ const API = {
     return await res.json();
   },
 
+  // 1c. Beginner courses (lessons are public; progress belongs to the signed-in student)
+  // The GitHub Pages copy has no backend, so these fail with a clear message there
+  // and the UI shows the notice instead of fake data.
+  _requireLiveServer() {
+    if (this.isStaticHost()) {
+      throw new Error('Courses and saved lesson progress need the live Code Wizard server. This static preview cannot load them.');
+    }
+  },
+
+  async getCourses() {
+    this._requireLiveServer();
+    const res = await fetch('/api/v1/courses', { credentials: 'same-origin', cache: 'no-store', headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to load courses.');
+    return await res.json();
+  },
+
+  async getCourse(courseId) {
+    this._requireLiveServer();
+    const res = await fetch(`/api/v1/courses/${encodeURIComponent(courseId)}`, {
+      credentials: 'same-origin', cache: 'no-store', headers: this.getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to load this course.');
+    return await res.json();
+  },
+
+  async setLessonProgress(courseId, lessonId, status) {
+    this._requireLiveServer();
+    const res = await fetch(
+      `/api/v1/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/progress`,
+      {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ status })
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Could not save your progress.');
+    return data;
+  },
+
   async runCode(code, language = 'python', stdin = '') {
     if (this.isStaticHost() && window.StaticEngine.runCode) {
       return window.StaticEngine.runCode(code, language, stdin);
@@ -284,6 +325,34 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.detail || 'Code execution failed.');
+    }
+    return data;
+  },
+
+  async requestErrorHelp({ code, language, errorMessage, action = 'explain', lessonContext = null }) {
+    if (this.isStaticHost()) {
+      return {
+        ai_configured: false,
+        action,
+        source: 'builtin',
+        message: 'Live AI help requires the Code Wizard backend server. Using built-in Error Detective analysis.'
+      };
+    }
+    const res = await fetch('/api/v1/error-help', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        code: code || '',
+        language: language || 'python',
+        error_message: errorMessage || '',
+        action,
+        lesson_context: lessonContext
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || 'Error Detective service unavailable.');
     }
     return data;
   },

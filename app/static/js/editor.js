@@ -92,13 +92,25 @@ class EditorManager {
   _normalizeLanguage(lang) {
     const l = (lang || '').toLowerCase();
     if (l === 'js' || l === 'javascript') return 'javascript';
+    if (l === 'ts' || l === 'typescript') return 'typescript';
     if (l === 'py' || l === 'python') return 'python';
     if (l === 'sql') return 'sql';
+    if (l === 'java') return 'java';
     if (l === 'c') return 'c';
     if (l === 'cpp' || l === 'c++') return 'cpp';
     if (l === 'html') return 'html';
     if (l === 'css') return 'css';
     return 'plaintext';
+  }
+
+  revealLine(lineNumber) {
+    const line = parseInt(lineNumber, 10);
+    if (!line || line < 1) return;
+    if (this.isMonacoReady && this.editor) {
+      this.editor.revealLineInCenter(line);
+      this.editor.setPosition({ lineNumber: line, column: 1 });
+      this.editor.focus();
+    }
   }
 
   setTheme(themeName) {

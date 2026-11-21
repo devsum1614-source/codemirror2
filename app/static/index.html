@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261114_1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261121_1">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -16,56 +16,62 @@
   <canvas id="confetti-canvas"></canvas>
 
   <div id="app-container">
-    <!-- Top Navigation Bar -->
-    <header class="navbar">
-      <div class="brand-wrapper" id="brand-btn" role="button" tabindex="0" title="Go to Languages Home">
-        <div class="brand-logo" style="background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; font-weight: 800; border-radius: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(99,102,241,0.35);">CW</div>
+    <!-- Top Navigation Bar (Programiz-inspired clean developer header) -->
+    <header class="navbar pz-navbar">
+      <div class="brand-wrapper" id="brand-btn" role="button" tabindex="0" title="Go to Code Wizard Home">
+        <div class="brand-logo pz-brand-logo">&lt;/&gt;</div>
         <div class="brand-text">
-          <h1 id="site-header-title">Code Wizard <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">2.0</span></h1>
+          <h1 id="site-header-title">Code Wizard</h1>
         </div>
       </div>
 
-      <nav aria-label="Main Navigation" id="main-nav-container" style="display: none;">
+      <nav aria-label="Main Navigation" id="main-nav-container">
         <ul class="nav-links">
-          <li class="student-nav-item">
+          <li class="student-nav-item public-nav-item">
             <button class="nav-btn active" data-view="languages" id="nav-languages-btn">
-              <span>🌐</span> Languages
+              Tutorials
             </button>
           </li>
-          <li class="student-nav-item">
-            <button class="nav-btn" data-view="dashboard" id="nav-dashboard-btn">
-              <span>📊</span> Dashboard
+          <li class="student-nav-item public-nav-item">
+            <button class="nav-btn" data-view="courses" id="nav-courses-btn">
+              Courses
             </button>
           </li>
-          <li class="student-nav-item">
-            <button class="nav-btn" data-view="examples" id="nav-examples-btn">
-              <span>💡</span> Code Examples
-            </button>
-          </li>
-          <li class="student-nav-item">
-            <button class="nav-btn" data-view="missions" id="nav-missions-btn">
-              <span>🎯</span> All Labs
-            </button>
-          </li>
-          <li class="student-nav-item">
+          <li class="student-nav-item public-nav-item">
             <button class="nav-btn" data-view="workspace" id="nav-workspace-btn">
-              <span>💻</span> Workspace
+              Online Compilers
+            </button>
+          </li>
+          <!-- Examples nav hidden per user request; view preserved for compatibility -->
+          <li id="nav-examples-li" style="display: none;" hidden>
+            <button class="nav-btn" data-view="examples" id="nav-examples-btn">
+              Examples
+            </button>
+          </li>
+          <li class="student-nav-item public-nav-item">
+            <button class="nav-btn" data-view="missions" id="nav-missions-btn">
+              Practice Labs
+            </button>
+          </li>
+          <li class="student-nav-item auth-only-nav-item" style="display: none;">
+            <button class="nav-btn" data-view="dashboard" id="nav-dashboard-btn">
+              Progress
             </button>
           </li>
           <!-- Hidden from student navigation for now; preserved for future use -->
           <li id="nav-skillproof-li" style="display: none;" hidden>
             <button class="nav-btn" data-view="skillproof" id="nav-skillproof-btn">
-              <span>🛡️</span> SkillProof
+              SkillProof
             </button>
           </li>
-          <li class="student-nav-item">
+          <li class="student-nav-item auth-only-nav-item" style="display: none;">
             <button class="nav-btn" data-view="report" id="nav-report-btn">
-              <span>📑</span> Report
+              Report
             </button>
           </li>
           <li id="nav-admin-li" style="display: none;" hidden>
             <button class="nav-btn" data-view="admin" id="nav-admin-btn" style="color: var(--indigo-primary); font-weight: 700;">
-              <span>⚙️</span> <span id="admin-nav-label">Admin Console</span>
+              ⚙️ <span id="admin-nav-label">Admin Console</span>
             </button>
           </li>
         </ul>
@@ -436,60 +442,52 @@
          VIEW 1: LANGUAGE HOME PAGE (Catalog of Supported Languages)
          ======================================================== -->
     <section id="view-languages" class="view-section">
-      <div class="hero-card">
-        <div class="hero-content">
-          <div class="hero-subtitle">
-            <span>🚀</span> HANDS-ON CODING WORKSPACE
+      <!-- Free Online Compilers Quick-Launch Grid (Programiz-style) -->
+      <div class="pz-section">
+        <div class="pz-section-head">
+          <div>
+            <h3>Online Compilers &amp; Code Editors</h3>
+            <p>Jump straight into a clean, distraction-free editor for any language.</p>
           </div>
-          <h2>Learn Programming Step by Step.<br/>Practice with Real Code and Instant Tests.</h2>
-          <p class="hero-desc">
-            Choose a programming language below to read short beginner lessons, study code examples,
-            and practice in the coding workspace with automated test checks.
-          </p>
-
-          <!-- Core Learning Rule Callout -->
-          <div style="background: rgba(79, 70, 229, 0.07); border: 1px solid var(--indigo-border); border-radius: var(--radius-md); padding: 12px 18px; max-width: 650px; margin-bottom: 16px; font-size: 0.84rem; color: var(--text-primary); line-height: 1.55;">
-            <strong>🛡️ Learn by Doing:</strong> Read the lab guide, write your solution in the code editor, and run the tests to check your work.
-          </div>
-
-          <!-- Quick Student Portal Shortcuts -->
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
-            <button type="button" class="btn btn-primary" onclick="App.handleContinueMission()" style="padding: 8px 16px; font-size: 0.84rem;">
-              <span>⚡</span> Continue Mission
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="App.switchView('dashboard')" style="padding: 8px 14px; font-size: 0.82rem;">
-              <span>📊</span> Student Dashboard
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="App.switchView('examples')" style="padding: 8px 14px; font-size: 0.82rem;">
-              <span>💡</span> Code Examples
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="App.switchView('missions')" style="padding: 8px 14px; font-size: 0.82rem;">
-              <span>🎯</span> All Labs
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="App.switchView('workspace')" style="padding: 8px 14px; font-size: 0.82rem;">
-              <span>💻</span> Open Workspace
-            </button>
-          </div>
-
-          <!-- Language Search and Filter Controls -->
-          <div class="catalog-controls" style="margin-top: 10px;">
-            <div class="search-input-wrapper">
-              <span class="search-icon">🔍</span>
-              <input type="text" id="lang-search-input" class="search-input" placeholder="Search languages (e.g. Python, Java, SQL, C)...">
-            </div>
-            <div class="filter-bar">
-              <button class="filter-btn active" data-lang-filter="all">All Languages</button>
-              <button class="filter-btn" data-lang-filter="ready">Ready to Run</button>
-              <button class="filter-btn" data-lang-filter="beginner">Beginner Friendly</button>
-              <button class="filter-btn" data-lang-filter="interpreted">Interpreted</button>
-              <button class="filter-btn" data-lang-filter="compiled">Compiled</button>
-            </div>
-          </div>
+        </div>
+        <div class="pz-compiler-grid" id="pz-compiler-grid">
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="python">
+            <span class="pz-lang-badge lang-py">Py</span>
+            <div class="pz-tile-text"><strong>Python Compiler</strong><span>main.py • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="c">
+            <span class="pz-lang-badge lang-c">C</span>
+            <div class="pz-tile-text"><strong>C Compiler</strong><span>main.c • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="cpp">
+            <span class="pz-lang-badge lang-cpp">C++</span>
+            <div class="pz-tile-text"><strong>C++ Compiler</strong><span>main.cpp • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="java">
+            <span class="pz-lang-badge lang-java">Java</span>
+            <div class="pz-tile-text"><strong>Java Compiler</strong><span>Main.java • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="javascript">
+            <span class="pz-lang-badge lang-js">JS</span>
+            <div class="pz-tile-text"><strong>JavaScript Compiler</strong><span>main.js • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="typescript">
+            <span class="pz-lang-badge lang-ts">TS</span>
+            <div class="pz-tile-text"><strong>TypeScript Compiler</strong><span>main.ts • Runnable</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="sql">
+            <span class="pz-lang-badge lang-sql">SQL</span>
+            <div class="pz-tile-text"><strong>SQL Editor</strong><span>query.sql • Live Tables</span></div>
+          </button>
+          <button type="button" class="pz-compiler-tile" data-compiler-lang="html">
+            <span class="pz-lang-badge lang-html">HTML</span>
+            <div class="pz-tile-text"><strong>HTML/CSS Editor</strong><span>index.html • Live Preview</span></div>
+          </button>
         </div>
       </div>
 
-      <!-- Student's Own Profile & Assigned Learning Programs (Visible only to the authenticated student) -->
-      <div class="glass-panel" id="student-assigned-programs-section" style="margin-bottom: 24px; padding: 20px;">
+      <!-- Student's Own Profile & Assigned Learning Programs (Visible only to authenticated student) -->
+      <div class="glass-panel" id="student-assigned-programs-section" style="margin-bottom: 24px; padding: 20px; display: none;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
           <div>
             <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
@@ -500,7 +498,7 @@
             </p>
           </div>
           <div id="student-own-profile-summary" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-            <!-- Populated dynamically with student's own name, class, level, XP, and completed labs -->
+            <!-- Populated dynamically -->
           </div>
         </div>
         <div id="student-assigned-programs-grid" class="missions-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
@@ -508,9 +506,71 @@
         </div>
       </div>
 
-      <!-- Languages Cards Grid -->
-      <div class="language-grid" id="languages-grid-container">
-        <!-- Rendered dynamically via app.js -->
+      <!-- Tutorials & Language Guides Catalog -->
+      <div class="pz-section">
+        <div class="pz-section-head">
+          <div>
+            <h3>Tutorials &amp; Language Guides</h3>
+            <p>Explore structured lessons, syntax examples, and hands-on coding labs.</p>
+          </div>
+          <div class="catalog-controls" style="margin-top: 0;">
+            <div class="search-input-wrapper">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="lang-search-input" class="search-input" placeholder="Search languages (Python, C, SQL, Java)...">
+            </div>
+            <div class="filter-bar">
+              <button class="filter-btn active" data-lang-filter="all">All</button>
+              <button class="filter-btn" data-lang-filter="ready">Ready to Run</button>
+              <button class="filter-btn" data-lang-filter="beginner">Beginner</button>
+              <button class="filter-btn" data-lang-filter="interpreted">Interpreted</button>
+              <button class="filter-btn" data-lang-filter="compiled">Compiled</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Languages Cards Grid -->
+        <div class="language-grid" id="languages-grid-container">
+          <!-- Rendered dynamically via app.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 1B: BEGINNER COURSES (student portal only)
+         Course catalog -> ordered lessons with progress -> lesson content
+         ======================================================== -->
+    <section id="view-courses" class="view-section" aria-labelledby="courses-heading">
+      <!-- Catalog -->
+      <div id="courses-catalog">
+        <div class="courses-header">
+          <h2 id="courses-heading">Beginner Courses</h2>
+          <p>Pick a language and follow the lessons in order: introduction, Hello world, variables, input and output, conditions, loops, functions and a small project.</p>
+        </div>
+        <div id="courses-notice" class="courses-notice" role="status" hidden></div>
+        <div class="courses-grid" id="courses-grid"><!-- Rendered by app.js --></div>
+      </div>
+
+      <!-- One course -->
+      <div id="course-detail" hidden>
+        <button type="button" class="btn btn-secondary courses-back-btn" id="course-back-btn">← All courses</button>
+        <div class="course-detail-head">
+          <div class="course-detail-title">
+            <span id="course-detail-icon" class="course-icon" aria-hidden="true"></span>
+            <div>
+              <h2 id="course-detail-name"></h2>
+              <p id="course-detail-tagline"></p>
+            </div>
+          </div>
+          <div class="course-progress-wrap" aria-live="polite">
+            <div class="course-progress-label"><span id="course-progress-text"></span></div>
+            <div class="course-progress-bar"><div id="course-progress-fill" class="course-progress-fill"></div></div>
+          </div>
+        </div>
+        <div id="course-runtime-note" class="courses-notice" role="status" hidden></div>
+        <div class="course-layout">
+          <nav class="course-lesson-nav" aria-label="Lessons"><ol id="course-lesson-list"></ol></nav>
+          <article class="course-lesson-pane" id="course-lesson-pane" aria-live="polite"><!-- Rendered by app.js --></article>
+        </div>
       </div>
     </section>
 
@@ -872,128 +932,250 @@
     </section>
 
     <!-- ========================================================
-         VIEW 5: CODING WORKSPACE
+         VIEW 5: PROGRAMIZ-STYLE ONLINE COMPILER & WORKSPACE
          ======================================================== -->
-    <section id="view-workspace" class="view-section" style="padding-bottom: 10px;">
-      <!-- Banner shown when experimenting with a Code Example in a fresh workspace -->
+    <section id="view-workspace" class="view-section pz-workspace-section" style="padding-bottom: 10px;">
+      <!-- Compact header bar showing active compiler title (e.g. "Python Online Compiler") -->
+      <div class="pz-compiler-subheader">
+        <div class="pz-compiler-title-wrap">
+          <span class="pz-compiler-brand-dot" id="compiler-lang-badge">Py</span>
+          <div>
+            <h2 id="compiler-heading-title">Python Online Compiler</h2>
+            <span id="editor-runtime-badge" class="pz-runtime-pill">● Ready</span>
+          </div>
+        </div>
+        <div class="pz-compiler-subactions">
+          <button type="button" id="compiler-copy-btn" class="btn btn-secondary pz-icon-btn" title="Copy code">Copy</button>
+          <button type="button" id="compiler-download-btn" class="btn btn-secondary pz-icon-btn" title="Download code file">Download</button>
+          <button type="button" id="compiler-theme-btn" class="btn btn-secondary pz-icon-btn" title="Toggle Dark/Light Theme">Theme</button>
+          <button type="button" id="save-code-btn" class="btn btn-secondary pz-icon-btn" title="Save your code">Save</button>
+          <button type="button" id="help-guide-btn" class="btn btn-secondary pz-icon-btn" title="Open Lab Guide">Lab Guide</button>
+        </div>
+      </div>
+
+      <!-- Banner shown when experimenting with a Code Example or Course Lesson -->
       <div id="workspace-example-banner" class="workspace-example-banner" style="display: none;">
         <div>
-          <strong id="workspace-example-banner-title">Example Mode:</strong>
-          <span id="workspace-example-banner-desc">You are trying a built-in code example. Your challenge starter code is safely preserved.</span>
+          <strong id="workspace-example-banner-title">Compiler Mode:</strong>
+          <span id="workspace-example-banner-desc">Write and run code freely. Your lab starter code is safely preserved.</span>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button type="button" id="workspace-back-to-examples-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.78rem;">
-            ← Code Examples
+            ← Examples
           </button>
           <button type="button" id="workspace-return-challenge-btn" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.78rem;">
-            Return to Challenge
+            Return to Lab
           </button>
         </div>
       </div>
 
-      <div class="workspace-container">
-        <!-- Left Sidebar: Exercise Files -->
-        <aside class="workspace-sidebar" aria-label="Exercise files">
-          <div class="file-tree-header">
-            <span>Files</span>
-          </div>
+      <!-- Host Runtime Warning banner (shown inline only for view-only compilers) -->
+      <div id="runtime-warning-banner" class="pz-runtime-warning" style="display: none;">
+        ⚠️ <strong id="runtime-warning-title">Runtime Notice:</strong> <span id="runtime-warning-text"></span>
+      </div>
 
-          <ul class="file-tree-list" id="workspace-file-list">
-            <li class="file-item active">
-              <span>📄</span> api_filter.py
-            </li>
+      <div class="pz-ide-shell" id="pz-ide-shell">
+        <!-- Left Vertical Language Icon Rail (Programiz-style) -->
+        <aside class="pz-lang-rail" aria-label="Select Online Compiler Language">
+          <button type="button" class="pz-rail-btn active" data-rail-lang="python" title="Python Online Compiler">Py</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="c" title="C Online Compiler">C</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="cpp" title="C++ Online Compiler">C++</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="java" title="Java Online Compiler">Java</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="javascript" title="JavaScript Online Compiler">JS</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="typescript" title="TypeScript Editor">TS</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="sql" title="Online SQL Editor">SQL</button>
+          <button type="button" class="pz-rail-btn" data-rail-lang="html" title="HTML &amp; CSS Online Editor">HTML</button>
+        </aside>
+
+        <!-- Hidden legacy file list preserved for compatibility -->
+        <div style="display: none;" aria-hidden="true">
+          <span>Files</span>
+          <ul id="workspace-file-list">
+            <li class="file-item active">main.py</li>
           </ul>
+        </div>
 
-          <!-- Host Runtime Warning banner -->
-          <div id="runtime-warning-banner" style="display: none; padding: 12px 14px; background: var(--amber-light); border-top: 1px solid var(--amber-border); font-size: 0.78rem; color: #78350F; line-height: 1.45;">
-            ⚠️ <strong id="runtime-warning-title">Runtime Notice:</strong> <span id="runtime-warning-text"></span>
+        <!-- SQL Left Schema Drawer (shown only in SQL mode, like Programiz Online SQL Editor) -->
+        <aside class="pz-sql-schema" id="pz-sql-schema" hidden aria-label="Database Tables Schema">
+          <div class="pz-sql-schema-head">Tables</div>
+          <div class="pz-sql-table-def">
+            <strong>Customers</strong>
+            <ul>
+              <li>customer_id <span>[int]</span></li>
+              <li>first_name <span>[text]</span></li>
+              <li>last_name <span>[text]</span></li>
+              <li>age <span>[int]</span></li>
+              <li>country <span>[text]</span></li>
+            </ul>
+          </div>
+          <div class="pz-sql-table-def">
+            <strong>Orders</strong>
+            <ul>
+              <li>order_id <span>[int]</span></li>
+              <li>item <span>[text]</span></li>
+              <li>amount <span>[int]</span></li>
+              <li>customer_id <span>[int]</span></li>
+            </ul>
+          </div>
+          <div class="pz-sql-table-def">
+            <strong>resources</strong>
+            <ul>
+              <li>id <span>[int]</span></li>
+              <li>title <span>[text]</span></li>
+              <li>category_id <span>[int]</span></li>
+              <li>status <span>[text]</span></li>
+            </ul>
           </div>
         </aside>
 
-        <!-- Center: Code Editor Panel (Main Focus) -->
-        <main class="editor-panel">
-          <div class="editor-toolbar">
-            <div class="editor-tabs">
-              <div class="tab-pill">
-                <span>📝</span> <span id="current-file-tab">api_filter.py</span>
+        <!-- Center: Code Editor Pane -->
+        <div class="pz-editor-pane" id="pz-editor-pane">
+          <div class="pz-pane-bar">
+            <div class="pz-file-tab-group">
+              <div class="pz-file-tab active">
+                <span id="current-file-tab">main.py</span>
               </div>
-              <div class="lang-select-wrapper">
-                <label for="editor-language-select" style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">Language:</label>
-                <select id="editor-language-select" class="lang-select" aria-label="Select Programming Language">
-                  <option value="python">Python 3</option>
-                  <option value="sql">SQL (SQLite)</option>
-                  <option value="html">HTML &amp; CSS</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="java">Java</option>
-                  <option value="c">C</option>
-                  <option value="cpp">C++</option>
-                </select>
-                <span id="editor-runtime-badge" class="stat-pill" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; background: rgba(15, 159, 130, 0.12); color: var(--teal-success);">
-                  ● Ready
-                </span>
-              </div>
+              <select id="editor-language-select" class="lang-select pz-lang-select-compact" aria-label="Select Programming Language">
+                <option value="python">Python 3</option>
+                <option value="c">C</option>
+                <option value="cpp">C++</option>
+                <option value="java">Java</option>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="sql">SQL (SQLite)</option>
+                <option value="html">HTML &amp; CSS</option>
+              </select>
             </div>
-
-            <div class="editor-actions">
-              <button id="save-code-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" title="Save your code">
-                Save
+            <div class="pz-editor-controls">
+              <button id="compiler-clear-code-btn" type="button" class="pz-btn-ghost" title="Clear editor">Clear</button>
+              <button id="reset-code-btn" type="button" class="pz-btn-ghost" title="Reset to starter code">Reset</button>
+              <button id="run-tests-btn" type="button" class="pz-btn-run" title="Run code (Ctrl+Enter)">
+                Run Tests ▶
               </button>
-              <button id="reset-code-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" title="Reset code to the starting template">
-                Reset
-              </button>
-              <button id="help-guide-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" title="Open the Lab Guide for instructions">
-                Help
-              </button>
-              <button id="run-tests-btn" type="button" class="btn btn-primary" style="padding: 7px 16px; font-size: 0.84rem; font-weight: 700;" title="Run tests for the current exercise">
-                <span>▶</span> Run Tests
-              </button>
-              <button id="submit-mission-btn" type="button" class="btn btn-success" style="padding: 6px 12px; font-size: 0.8rem;" title="Submit your finished solution">
+              <button id="submit-mission-btn" type="button" class="btn btn-success pz-btn-submit" style="display: none;" title="Submit graded lab">
                 Submit
               </button>
             </div>
           </div>
 
-          <div class="editor-canvas">
+          <div class="editor-canvas pz-editor-canvas">
             <div id="monaco-container"></div>
             <textarea id="fallback-editor" spellcheck="false" placeholder="Write your code here..."></textarea>
           </div>
 
-          <!-- Optional Custom Input Area (Collapsed by default so the code editor stays the main focus) -->
-          <details class="custom-input-box">
-            <summary class="custom-input-toggle">Custom Input (optional)</summary>
-            <div style="margin-top: 8px;">
-              <textarea id="custom-input-text" rows="2" class="form-control" style="font-family: var(--font-mono); font-size: 0.8rem; resize: vertical;" placeholder="Enter custom test input here (optional)..."></textarea>
+          <!-- Collapsible Standard Input (stdin) -->
+          <details class="custom-input-box pz-stdin-box" id="pz-stdin-details">
+            <summary class="custom-input-toggle">Input (stdin) — optional</summary>
+            <div style="margin-top: 6px;">
+              <textarea id="custom-input-text" rows="2" class="form-control" style="font-family: var(--font-mono); font-size: 0.82rem; resize: vertical;" placeholder="Type program input here (used by input(), scanf, cin, Scanner)..."></textarea>
             </div>
           </details>
-        </main>
+        </div>
 
-        <!-- Right Panel: Tabs for "Test Results" and "Lab Guide" -->
-        <aside class="workspace-right">
-          <div class="right-tab-bar">
-            <button class="right-tab-btn active" type="button" data-tab="output">
-              <span>▶</span> Test Results
-            </button>
-            <button class="right-tab-btn" type="button" data-tab="guide">
-              <span>📋</span> Lab Guide
-            </button>
+        <!-- Draggable Vertical Divider -->
+        <div class="pz-resizer" id="pz-resizer" role="separator" aria-orientation="vertical" aria-label="Resize editor and output" tabindex="0"></div>
+
+        <!-- Right Pane: Output / Preview / Error Detective / Lab Guide -->
+        <aside class="pz-output-pane" id="pz-output-pane">
+          <div class="pz-pane-bar pz-output-bar">
+            <div class="right-tab-bar pz-right-tabs">
+              <button class="right-tab-btn active" type="button" data-tab="output" id="pz-tab-output-btn">
+                Output
+              </button>
+              <button class="right-tab-btn" type="button" data-tab="guide" id="pz-tab-guide-btn">
+                Lab Guide
+              </button>
+            </div>
+            <button type="button" id="compiler-clear-output-btn" class="pz-btn-ghost" title="Clear output">Clear</button>
           </div>
 
-          <div class="tab-content-area">
-            <!-- TAB 1: TEST RESULTS -->
+          <div class="tab-content-area pz-output-body">
+            <!-- TAB 1: OUTPUT, PREVIEW & ERROR DETECTIVE -->
             <div id="tab-pane-output" class="right-tab-pane active">
               <div id="test-summary-box" style="display: none;"></div>
 
-              <!-- Test Results Output -->
+              <!-- Output / Test Results -->
               <div id="test-results-container">
-                <div style="text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.86rem;">
-                  Click <strong>▶ Run Tests</strong> above to check your code.
+                <div class="pz-empty-output">
+                  Click <strong>Run ▶</strong> to execute your code and see the output here.
+                </div>
+              </div>
+
+              <!-- ERROR DETECTIVE PANEL (shown automatically when code produces an error) -->
+              <section id="error-detective-panel" class="ed-panel" hidden aria-label="Error Detective">
+                <div class="ed-header">
+                  <div class="ed-title-row">
+                    <span class="ed-badge">🔍 Error Detective</span>
+                    <strong id="ed-error-title">Error detected</strong>
+                  </div>
+                  <button type="button" id="ed-line-jump-btn" class="ed-line-pill" hidden>Line 1</button>
+                </div>
+
+                <div class="ed-section">
+                  <div class="ed-label">Original Error</div>
+                  <pre id="ed-raw-error" class="ed-raw-pre"></pre>
+                </div>
+
+                <div class="ed-section">
+                  <div class="ed-label">What This Likely Means</div>
+                  <p id="ed-plain-explanation" class="ed-plain-text"></p>
+                  <p id="ed-uncertain-note" class="ed-uncertain-note" hidden></p>
+                </div>
+
+                <div class="ed-actions">
+                  <button type="button" class="btn btn-secondary ed-action-btn" id="ed-btn-hint">Give me a hint</button>
+                  <button type="button" class="btn btn-secondary ed-action-btn" id="ed-btn-explain">Explain this error</button>
+                  <button type="button" class="btn btn-primary ed-action-btn" id="ed-btn-fix">Suggest a fix</button>
+                </div>
+
+                <div id="ed-response-box" class="ed-response-box" hidden>
+                  <div class="ed-response-meta" id="ed-response-meta"></div>
+                  <div class="ed-response-text" id="ed-response-text"></div>
+                </div>
+
+                <div id="ed-fix-compare" class="ed-fix-compare" hidden>
+                  <div class="ed-label">Compare Suggested Fix (your code is unchanged until you apply)</div>
+                  <div id="ed-diff-view" class="ed-diff-view"></div>
+                  <div class="ed-fix-actions">
+                    <button type="button" class="btn btn-primary" id="ed-apply-fix-btn">Apply fix to editor</button>
+                    <button type="button" class="btn btn-secondary" id="ed-cancel-fix-btn">Keep my code</button>
+                  </div>
+                </div>
+              </section>
+
+              <!-- SQL Available Tables Preview (shown only in SQL mode) -->
+              <div id="pz-sql-tables-preview" class="pz-sql-tables-preview" hidden>
+                <div class="pz-sql-preview-title">Available Tables</div>
+                <div class="pz-sql-mini-table-wrap">
+                  <div class="pz-sql-mini-caption">Customers</div>
+                  <table class="pz-sql-table">
+                    <thead><tr><th>customer_id</th><th>first_name</th><th>last_name</th><th>age</th><th>country</th></tr></thead>
+                    <tbody>
+                      <tr><td>1</td><td>John</td><td>Doe</td><td>31</td><td>USA</td></tr>
+                      <tr><td>2</td><td>Robert</td><td>Luna</td><td>22</td><td>USA</td></tr>
+                      <tr><td>3</td><td>David</td><td>Robinson</td><td>22</td><td>UK</td></tr>
+                      <tr><td>4</td><td>John</td><td>Reinhardt</td><td>25</td><td>UK</td></tr>
+                      <tr><td>5</td><td>Betty</td><td>Doe</td><td>28</td><td>UAE</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pz-sql-mini-table-wrap">
+                  <div class="pz-sql-mini-caption">Orders</div>
+                  <table class="pz-sql-table">
+                    <thead><tr><th>order_id</th><th>item</th><th>amount</th><th>customer_id</th></tr></thead>
+                    <tbody>
+                      <tr><td>1</td><td>Keyboard</td><td>400</td><td>4</td></tr>
+                      <tr><td>2</td><td>Mouse</td><td>300</td><td>4</td></tr>
+                      <tr><td>3</td><td>Monitor</td><td>12000</td><td>3</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
               <!-- HTML Live Preview (Rendered when language is HTML) -->
               <div id="html-preview-container" class="html-preview-container" style="display: none;">
                 <div class="html-preview-header">
-                  <span>🌐 Page Preview</span>
+                  <span>🌐 Live Preview</span>
                 </div>
                 <iframe id="html-preview-frame" class="html-preview-frame" sandbox="allow-scripts"></iframe>
               </div>
@@ -1703,11 +1885,12 @@
       window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     }
   </script>
-  <script src="/static/js/particles.js?v=20261114_1"></script>
-  <script src="/static/js/static_data.js?v=20261114_1"></script>
-  <script src="/static/js/static_engine.js?v=20261114_1"></script>
-  <script src="/static/js/api.js?v=20261114_1"></script>
-  <script src="/static/js/editor.js?v=20261114_1"></script>
-  <script src="/static/js/app.js?v=20261114_1"></script>
+  <script src="/static/js/particles.js?v=20261121_1"></script>
+  <script src="/static/js/static_data.js?v=20261121_1"></script>
+  <script src="/static/js/static_engine.js?v=20261121_1"></script>
+  <script src="/static/js/api.js?v=20261121_1"></script>
+  <script src="/static/js/error_detective.js?v=20261121_3"></script>
+  <script src="/static/js/editor.js?v=20261121_1"></script>
+  <script src="/static/js/app.js?v=20261121_3"></script>
 </body>
 </html>

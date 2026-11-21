@@ -70,6 +70,18 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_student_programs_student ON student_programs(student_id);
 
+    -- Beginner course progress: one row per learner per lesson (absent row = not started)
+    CREATE TABLE IF NOT EXISTS lesson_progress (
+        student_id TEXT NOT NULL,
+        course_id TEXT NOT NULL,
+        lesson_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'in_progress', -- 'in_progress', 'completed'
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, lesson_id),
+        FOREIGN KEY (student_id) REFERENCES accounts(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_lesson_progress_student ON lesson_progress(student_id, course_id);
+
     CREATE TABLE IF NOT EXISTS site_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,

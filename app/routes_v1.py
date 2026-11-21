@@ -55,6 +55,13 @@ class CoachAskRequest(BaseModel):
 class CreateStudentRequest(BaseModel):
     display_name: Optional[str] = None
 
+class ErrorHelpRequest(BaseModel):
+    code: str = Field("", description="Learner's current source code")
+    language: str = Field("python", description="Selected programming language")
+    error_message: str = Field("", description="Original compiler or runtime error message")
+    action: str = Field("explain", description="hint | explain | fix")
+    lesson_context: Optional[str] = Field(None, description="Optional lesson or challenge title/prompt")
+
 
 # Helper to authenticate or resolve student
 def resolve_student_id(request: Optional[Request] = None, header_student_id: Optional[str] = None) -> str:
@@ -603,3 +610,123 @@ def create_student(req: CreateStudentRequest):
         "id": new_id,
         "display_name": display_name
     }
+
+
+@router.post("/error-help")
+def error_detective_help(req: ErrorHelpRequest):
+    """
+    Beginner-friendly Error Detective backend endpoint.
+    Sends only code, language, lesson context, and error message to Gemini when GEMINI_API_KEY
+    is configured in server environment variables. Never exposes API keys to the browser.
+    """
+    action = (req.action or "explain").strip().lower()
+    if action not in ("hint", "explain", "fix"):
+        action = "explain"
+
+    if not is_ai_configured():
+        return {
+            "ai_configured": False,
+            "action": action,
+            "source": "builtin",
+            "message": (
+                "Live AI help is not configured on this server (no GEMINI_API_KEY set). "
+                "Showing built-in Error Detective analysis based on the compiler/runtime error."
+            ),
+            "suggested_code": None,
+        }
+
+    import os
+    import json
+    import urllib.request
+    import urllib.parse
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    instruction_by_action = {
+        "hint": (
+            "Give a short, gentle, beginner-friendly hint that points the learner toward the bug "
+            "without giving away the full corrected program. Mention the line number if clear, "
+            "and say if you are uncertain."
+        ),
+        "explain": (
+            "Explain what this compiler or runtime error likely means in plain, beginner-friendly language. "
+            "Point out which line or part of the code to investigate if available, and state clearly if "
+            "the exact cause is uncertain."
+        ),
+        "fix": (
+            "Suggest a minimal fix for the error. Return a JSON object with keys: "
+            "'explanation' (1-2 beginner-friendly sentences), 'uncertain' (boolean), and "
+            "'suggested_code' (the complete updated code string, or null if you are not confident). "
+            "Do not wrap JSON in markdown fences."
+        ),
+    }
+
+    prompt = (
+        f"You are Error Detective, a friendly beginner coding tutor.\n"
+        f"Language: {req.language}\n"
+        f"Lesson context: {req.lesson_context or 'General practice'}\n"
+        f"Error message:\n{req.error_message}\n\n"
+        f"Learner code:\n{req.code}\n\n"
+        f"Task: {instruction_by_action[action]}"
+    )
+
+    try:
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            + urllib.parse.quote(model, safe="-._")
+            + f":generateContent?key={urllib.parse.quote(api_key, safe='')}"
+        )
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 600},
+        }).encode("utf-8")
+        request = urllib.request.Request(
+            url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(request, timeout=18) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+        text = (
+            raw.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "")
+            .strip()
+        )
+        if not text:
+            raise ValueError("Empty AI response")
+
+        suggested_code = None
+        message = text
+        uncertain = False
+        if action == "fix":
+            cleaned = text.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            try:
+                parsed = json.loads(cleaned)
+                message = str(parsed.get("explanation") or "Review the suggested change before applying it.")
+                suggested_code = parsed.get("suggested_code")
+                uncertain = bool(parsed.get("uncertain", False))
+            except Exception:
+                message = text
+
+        return {
+            "ai_configured": True,
+            "action": action,
+            "source": "gemini",
+            "message": message,
+            "suggested_code": suggested_code,
+            "uncertain": uncertain,
+        }
+    except Exception:
+        return {
+            "ai_configured": True,
+            "action": action,
+            "source": "fallback",
+            "message": (
+                "The AI service could not be reached right now. "
+                "Your original error is still shown above, and built-in hints remain available."
+            ),
+            "suggested_code": None,
+            "uncertain": True,
+        }
