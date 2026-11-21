@@ -372,7 +372,7 @@ def init_db():
     # Seed default site settings
     default_settings = [
         ("xp_per_level", "100"),
-        ("platform_name", "CodeMirror 2.0 - Beginner Coding Tutor"),
+        ("platform_name", "Code Wizard - Online Compilers & Coding Tutorials"),
         ("theme_primary", "#4F46E5"),
         ("theme_background", "#F7F8FC"),
         ("theme_surface", "#FFFFFF"),
